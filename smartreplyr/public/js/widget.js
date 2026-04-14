@@ -7,15 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const root = document.getElementById('smartreplyr-widget-root');
     root.classList.add(smartreplyrConfig.position);
 
-    // Build courses options
-    let coursesHtml = '<option value="">Select a course...</option>';
-    if (smartreplyrConfig.courses && smartreplyrConfig.courses.length > 0) {
-        smartreplyrConfig.courses.forEach(course => {
-            if(course) coursesHtml += `<option value="${course}">${course}</option>`;
-        });
-    }
-
-    // Build Widget HTML
+    // Build Widget HTML (No static form, fully chat UI)
     const widgetHtml = `
         <div class="sr-widget-window">
             <div class="sr-widget-header">
@@ -29,57 +21,20 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             
             <div class="sr-widget-body">
-                <!-- Lead Capture Form View -->
-                <div class="sr-lead-form" id="sr-form-view">
-                    <div class="sr-form-intro">
-                        <h4>Hello there! 👋</h4>
-                        <p>Please share your details below so our counselors can assist you better.</p>
-                    </div>
-                    
-                    <form id="sr-capture-form">
-                        <div class="sr-input-group">
-                            <label>Full Name *</label>
-                            <input type="text" id="sr_name" required placeholder="John Doe">
-                        </div>
-                        <div class="sr-input-group">
-                            <label>Email Address *</label>
-                            <input type="email" id="sr_email" required placeholder="john@example.com">
-                        </div>
-                        <div class="sr-input-group">
-                            <label>Phone Number *</label>
-                            <input type="tel" id="sr_phone" required placeholder="+1 234 567 8900">
-                        </div>
-                        ${coursesHtml.length > 45 ? `
-                        <div class="sr-input-group">
-                            <label>Course of Interest</label>
-                            <select id="sr_course">${coursesHtml}</select>
-                        </div>` : ''}
-                        
-                        ${smartreplyrConfig.gdpr_enabled === '1' ? `
-                        <div class="sr-gdpr-group">
-                            <input type="checkbox" id="sr_consent" required checked>
-                            <label for="el_consent">${smartreplyrConfig.gdpr_text}</label>
-                        </div>` : ''}
-                        
-                        <button type="submit" class="sr-btn-submit" id="sr-btn-submit">Start Chatting</button>
-                        <p style="text-align:center; font-size:11px; color:#9ca3af; margin:10px 0 0 0; font-family:'Inter', sans-serif;">
-                            🔒 Your details are encrypted and never shared
-                        </p>
-                    </form>
-                </div>
-
-                <!-- Chat Interface View -->
                 <div class="sr-chat-interface" id="sr-chat-view">
                     <div class="sr-messages" id="sr-messages-container">
-                        <!-- Messages appended here -->
+                        <!-- Messages dynamically appended here -->
                     </div>
                     
-                    <form class="sr-chat-input" id="sr-chat-form">
-                        <input type="text" id="sr_chat_msg" placeholder="Type your message..." autocomplete="off">
-                        <button type="submit" class="sr-btn-send">
-                            <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
-                        </button>
-                    </form>
+                    <div class="sr-chat-input-wrapper">
+                        <form class="sr-chat-input" id="sr-chat-form">
+                            <input type="text" id="sr_chat_msg" placeholder="Type your message..." autocomplete="off">
+                            <button type="submit" class="sr-btn-send" id="sr-btn-send">
+                                <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+                            </button>
+                        </form>
+                        <div class="sr-trust-badge">🔒 100% secure • No spam • Instant response</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -92,62 +47,126 @@ document.addEventListener('DOMContentLoaded', function() {
 
     root.innerHTML = widgetHtml;
 
-    // Elements
+    // DOM Elements
     const triggerBtn = document.getElementById('sr-trigger-btn');
-    const formView = document.getElementById('sr-form-view');
-    const chatView = document.getElementById('sr-chat-view');
-    const captureForm = document.getElementById('sr-capture-form');
-    const chatForm = document.getElementById('sr-chat-form');
     const messagesContainer = document.getElementById('sr-messages-container');
+    const chatForm = document.getElementById('sr-chat-form');
     const msgInput = document.getElementById('sr_chat_msg');
+    const sendBtn = document.getElementById('sr-btn-send');
 
-    // Initialize intlTelInput
-    const phoneInput = document.getElementById('sr_phone');
-    let iti = null;
-    if (window.intlTelInput) {
-        iti = window.intlTelInput(phoneInput, {
-            initialCountry: "auto",
-            geoIpLookup: function(callback) {
-                fetch("https://ipapi.co/json")
-                  .then(function(res) { return res.json(); })
-                  .then(function(data) { callback(data.country_code); })
-                  .catch(function() { callback("us"); });
-            },
-            utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/18.2.1/js/utils.js"
-        });
-    }
-
-    // State
+    // Lead Flow State Machine
     let leadId = sessionStorage.getItem('smartreplyr_lead_id');
-    
+    const LeadFlow = {
+        state: leadId ? 'complete' : 'pre_lead', 
+        data: { initial_query: '', name: '', email: '', phone: '', course: '' }
+    };
+
+    let hasOpened = false;
+    let isTyping = false;
+
     // Toggle Widget
     triggerBtn.addEventListener('click', () => {
         root.classList.toggle('is-open');
-        if (root.classList.contains('is-open') && leadId) {
+        if (root.classList.contains('is-open')) {
             msgInput.focus();
+            if(!hasOpened && !leadId) {
+                hasOpened = true;
+                // Initiate Conversation
+                enqueueBotResponse("Hi 👋 What would you like to know today?");
+            }
         }
     });
 
-    // Check session state
+    // Smart Auto-Open logic
+    setTimeout(() => {
+        if(!root.classList.contains('is-open') && !hasOpened) {
+            triggerBtn.click();
+        }
+    }, 5000);
+
+    // Provide initial view if already authenticated
     if (leadId) {
-        showChatInterface();
-        // optionally load history from another endpoint, else just show empty
+        hasOpened = true;
+        // Load soft welcome if page fresh loaded
+        enqueueBotResponse("Welcome back! How can I help you today?");
     }
 
-    // Lead Submission
-    captureForm.addEventListener('submit', async (e) => {
+    // Chat Message Submission Handler
+    chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
-        const submitBtn = document.getElementById('sr-btn-submit');
-        submitBtn.innerText = 'Submitting...';
-        submitBtn.disabled = true;
+        const msg = msgInput.value.trim();
+        if (!msg || isTyping) return;
 
+        appendUserMessage(msg);
+        msgInput.value = '';
+        
+        await processStateMachine(msg);
+    });
+
+    // Global helper for chips quick-replies
+    window.srSelectChip = function(value) {
+        msgInput.value = value;
+        chatForm.dispatchEvent(new Event('submit'));
+        // remove existing chips
+        document.querySelectorAll('.sr-quick-replies').forEach(e => e.remove());
+    };
+
+    // State Machine Processor
+    async function processStateMachine(msg) {
+        if (LeadFlow.state === 'pre_lead') {
+            LeadFlow.data.initial_query = msg;
+            LeadFlow.state = 'name';
+            enqueueBotResponse("I can help with that! Before we continue, what is your full name?");
+        } 
+        else if (LeadFlow.state === 'name') {
+            LeadFlow.data.name = msg;
+            LeadFlow.state = 'email';
+            enqueueBotResponse(`Nice to meet you, ${msg.split(' ')[0]}! What is your best email address?`);
+        } 
+        else if (LeadFlow.state === 'email') {
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(msg)) {
+                enqueueBotResponse("Hmm, that email doesn't look quite right. Could you double-check it?");
+                return;
+            }
+            LeadFlow.data.email = msg;
+            LeadFlow.state = 'phone';
+            enqueueBotResponse("Thanks! And what is the best phone number to reach you at?");
+        } 
+        else if (LeadFlow.state === 'phone') {
+            LeadFlow.data.phone = msg;
+            LeadFlow.state = 'course';
+            
+            let coursesHtml = '';
+            if (smartreplyrConfig.courses && smartreplyrConfig.courses.length > 0) {
+                coursesHtml = '<div class="sr-quick-replies">' + 
+                    smartreplyrConfig.courses.map(c => {
+                        if(c) return `<button type="button" class="sr-chip" onclick="srSelectChip('${c}')">${c}</button>`;
+                        return '';
+                    }).join('') + '</div>';
+            }
+            
+            enqueueBotResponse("Almost done! Which course are you interested in?", coursesHtml);
+        } 
+        else if (LeadFlow.state === 'course') {
+            LeadFlow.data.course = msg;
+            LeadFlow.state = 'submitting';
+            
+            enqueueBotResponse("Saving your details... 🔒");
+            await submitLeadToApi();
+        } 
+        else if (LeadFlow.state === 'complete') {
+            // Standard AI Chat Loop
+            await askAI(msg);
+        }
+    }
+
+    async function submitLeadToApi() {
         const payload = {
-            name: document.getElementById('sr_name').value,
-            email: document.getElementById('sr_email').value,
-            phone: iti ? iti.getNumber() : document.getElementById('sr_phone').value,
-            course_interest: document.getElementById('sr_course') ? document.getElementById('sr_course').value : '',
-            consent: document.getElementById('sr_consent') ? (document.getElementById('sr_consent').checked ? 1 : 0) : 1,
+            name: LeadFlow.data.name,
+            email: LeadFlow.data.email,
+            phone: LeadFlow.data.phone,
+            course_interest: LeadFlow.data.course,
+            consent: smartreplyrConfig.gdpr_enabled === '1' ? 1 : 0,
             page_url: window.location.href,
             page_title: smartreplyrConfig.page_title,
             referrer: document.referrer,
@@ -162,40 +181,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            
             const data = await res.json();
             
             if (data.success) {
                 leadId = data.lead_id;
                 sessionStorage.setItem('smartreplyr_lead_id', leadId);
-                showChatInterface();
-                appendBotMessage(data.message);
+                LeadFlow.state = 'complete';
+                
+                // Immediately ask the initial query they had!
+                if (LeadFlow.data.initial_query) {
+                    await askAI(LeadFlow.data.initial_query);
+                } else {
+                    enqueueSmartPrompts("Thanks! A counselor will be in touch. What else can I help you with?");
+                }
             } else {
-                alert(data.message || 'Submission failed. Please try again.');
-                submitBtn.innerText = 'Start Chatting';
-                submitBtn.disabled = false;
+                enqueueBotResponse("I'm so sorry, there was an issue saving your details. Please try again later.");
+                LeadFlow.state = 'course'; // let them retry
             }
         } catch (err) {
-            alert('A network error occurred.');
-            submitBtn.innerText = 'Start Chatting';
-            submitBtn.disabled = false;
+            enqueueBotResponse("Network error capturing details. Please try again.");
+            LeadFlow.state = 'course';
         }
-    });
+    }
 
-    // Chat Message Submission
-    chatForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const msg = msgInput.value.trim();
-        if (!msg || !leadId) return;
-
-        // Add user msg to UI
-        appendUserMessage(msg);
-        msgInput.value = '';
-        
-        // Show typing indicator
+    async function askAI(msg) {
+        if (!leadId) return;
         const typingId = showTypingIndicator();
-
+        
         try {
             const res = await fetch(`${smartreplyrConfig.api_url}/chat`, {
                 method: 'POST',
@@ -206,13 +218,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     page_context: window.location.href
                 })
             });
-            
             const data = await res.json();
             
             removeTypingIndicator(typingId);
-            
             if (data.success) {
                 appendBotMessage(data.reply);
+                enqueueSmartPrompts("");
             } else {
                 appendBotMessage("Sorry, I encountered an error. Please try again.");
             }
@@ -220,13 +231,34 @@ document.addEventListener('DOMContentLoaded', function() {
             removeTypingIndicator(typingId);
             appendBotMessage("Network error. Please try again.");
         }
-    });
+    }
 
-    // View Transitions
-    function showChatInterface() {
-        formView.style.display = 'none';
-        chatView.style.display = 'flex';
-        msgInput.focus();
+    // Delay Wrapper for Bot Messages (600 - 1200ms)
+    function enqueueBotResponse(textHtml, rawHtmlAppend = '') {
+        const id = showTypingIndicator();
+        const delay = Math.floor(Math.random() * 600) + 600; // 600 to 1200ms delay
+        
+        setTimeout(() => {
+            removeTypingIndicator(id);
+            if(textHtml) {
+                appendBotMessage(textHtml);
+            }
+            if(rawHtmlAppend) {
+                messagesContainer.insertAdjacentHTML('beforeend', rawHtmlAppend);
+                scrollToBottom();
+            }
+        }, delay);
+    }
+
+    function enqueueSmartPrompts(preludeMsg) {
+        let msg = preludeMsg || "Are you looking for anything specific?";
+        let prompts = '<div class="sr-quick-replies">' + 
+            `<button class="sr-chip" onclick="srSelectChip('Check Fees Structure')">Fees Structure</button>` +
+            `<button class="sr-chip" onclick="srSelectChip('What is the Admission Process?')">Admission Process</button>` +
+            `<button class="sr-chip" onclick="srSelectChip('I want to talk to a counselor')">Talk to Counselor</button>` +
+            '</div>';
+        
+        enqueueBotResponse(msg, prompts);
     }
 
     // UI Helpers
@@ -241,10 +273,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showTypingIndicator() {
+        isTyping = true;
+        msgInput.disabled = true;
+        sendBtn.disabled = true;
+        
         const id = 'typing-' + Date.now();
         messagesContainer.insertAdjacentHTML('beforeend', `
             <div class="sr-msg sr-msg-bot" id="${id}">
-                <div class="sr-typing"><div class="sr-dot"></div><div class="sr-dot"></div><div class="sr-dot"></div></div>
+                <div class="sr-typing"><span></span><span></span><span></span></div>
             </div>
         `);
         scrollToBottom();
@@ -252,8 +288,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function removeTypingIndicator(id) {
+        isTyping = false;
+        msgInput.disabled = false;
+        sendBtn.disabled = false;
+        
         const el = document.getElementById(id);
         if (el) el.remove();
+        
+        msgInput.focus();
     }
 
     function scrollToBottom() {
