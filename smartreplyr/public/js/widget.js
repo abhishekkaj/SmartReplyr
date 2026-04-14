@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         ${smartreplyrConfig.gdpr_enabled === '1' ? `
                         <div class="sr-gdpr-group">
-                            <input type="checkbox" id="sr_consent" required>
+                            <input type="checkbox" id="sr_consent" required checked>
                             <label for="el_consent">${smartreplyrConfig.gdpr_text}</label>
                         </div>` : ''}
                         

@@ -11,7 +11,7 @@
 
         // --- Avatar Upload (WP Media) ---
         let mediaUploader;
-        $('#el-upload-avatar').on('click', function(e) {
+        $('#sr-upload-avatar').on('click', function(e) {
             e.preventDefault();
             if (mediaUploader) {
                 mediaUploader.open();
@@ -25,7 +25,7 @@
             mediaUploader.on('select', function() {
                 const attachment = mediaUploader.state().get('selection').first().toJSON();
                 $('#avatar_url').val(attachment.url);
-                $('#el-avatar-preview').attr('src', attachment.url);
+                $('#sr-avatar-preview').attr('src', attachment.url);
             });
             mediaUploader.open();
         });
