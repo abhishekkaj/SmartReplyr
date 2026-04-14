@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="sr-header-info">
                     <h3>${smartreplyrConfig.bot_name}</h3>
-                    <p>We typically reply in a few seconds</p>
+                    <p>Get instant answers about courses & admissions</p>
                 </div>
             </div>
             
@@ -62,6 +62,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>` : ''}
                         
                         <button type="submit" class="sr-btn-submit" id="sr-btn-submit">Start Chatting</button>
+                        <p style="text-align:center; font-size:11px; color:#9ca3af; margin:10px 0 0 0; font-family:'Inter', sans-serif;">
+                            🔒 Your details are encrypted and never shared
+                        </p>
                     </form>
                 </div>
 

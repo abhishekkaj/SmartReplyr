@@ -24,21 +24,41 @@
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: var(--sr-primary);
-    color: white;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    transition: transform 0.2s, box-shadow 0.2s;
     border: none;
     outline: none;
+    position: relative;
+    z-index: 2; 
+    transition: transform 0.2s;
+}
+
+.sr-widget-trigger::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: rgba(99,102,241,0.4);
+    animation: sr-pulse 2s infinite;
+    z-index: -1;
+}
+
+@keyframes sr-pulse {
+    0% { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(1.6); opacity: 0; }
+}
+
+.is-open .sr-widget-trigger::after {
+    display: none;
 }
 
 .sr-widget-trigger:hover {
     transform: scale(1.05);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.2);
 }
 
 .sr-widget-trigger svg { width: 28px; height: 28px; fill: currentColor; }
@@ -55,8 +75,9 @@
     height: 600px;
     max-height: calc(100vh - 120px);
     background: var(--sr-bg);
-    border-radius: 16px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    font-family: 'Inter', sans-serif;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -76,9 +97,9 @@
 
 /* Header */
 .sr-widget-header {
-    background: var(--sr-primary);
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
     color: white;
-    padding: 20px;
+    padding: 16px;
     display: flex;
     align-items: center;
     gap: 15px;
@@ -127,20 +148,26 @@
 .sr-form-intro h4 { margin: 0 0 8px; font-size: 18px; color: var(--sr-text); }
 .sr-form-intro p { margin: 0; font-size: 14px; color: var(--sr-muted); line-height: 1.4; }
 
-.sr-input-group { display: flex; flex-direction: column; gap: 5px; }
+.sr-input-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
 .sr-input-group label { font-size: 13px; font-weight: 500; color: var(--sr-text); }
 .sr-input-group input, .sr-input-group select {
-    padding: 10px 12px;
-    border: 1px solid var(--sr-border);
-    border-radius: 8px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    padding: 12px;
     font-size: 14px;
+    transition: all 0.2s ease;
     outline: none;
-    transition: 0.2s;
     font-family: inherit;
+    color: #111 !important;
+    background: #fff !important;
+    z-index: 9999;
+}
+.sr-input-group select option {
+    color: #111;
 }
 .sr-input-group input:focus, .sr-input-group select:focus {
-    border-color: var(--sr-primary);
-    box-shadow: 0 0 0 2px var(--sr-user-msg);
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
 }
 
 .iti { width: 100%; display: block; }
@@ -154,18 +181,21 @@
 .sr-gdpr-group label { font-size: 12px; color: var(--sr-muted); line-height: 1.4; font-weight: normal; }
 
 .sr-btn-submit {
-    background: var(--sr-primary);
-    color: white;
-    border: none;
-    padding: 12px;
-    border-radius: 8px;
-    font-size: 15px;
+    border-radius: 12px;
+    padding: 14px;
     font-weight: 600;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    border: none;
+    transition: all 0.2s ease;
     cursor: pointer;
     margin-top: 5px;
-    transition: 0.2s;
+    font-size: 15px;
 }
-.sr-btn-submit:hover { opacity: 0.9; }
+.sr-btn-submit:hover { 
+    transform: translateY(-1px);
+    box-shadow: 0 10px 25px rgba(99,102,241,0.3);
+}
 .sr-btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* Chat Interface */
@@ -255,12 +285,12 @@
 
 /* Mobile Responsive */
 @media (max-width: 480px) {
-    #smartreplyr-widget-root { bottom: 15px; right: 15px; }
+    #smartreplyr-widget-root { bottom: 15px; right: 15px; left: 15px; }
     .sr-widget-window {
         position: fixed;
         bottom: 0; left: 0; right: 0;
-        width: 100%; height: 100%; max-height: 100%;
-        border-radius: 0;
+        width: 100%; height: 85vh; max-height: 100vh;
+        border-radius: 20px 20px 0 0;
         z-index: 100000;
         transform: translateY(100%);
     }
