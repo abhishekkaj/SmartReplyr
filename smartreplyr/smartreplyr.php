@@ -18,6 +18,16 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+if ( ! function_exists( 'smartreplyr_sandbox_shutdown' ) ) {
+    function smartreplyr_sandbox_shutdown() {
+        $error = error_get_last();
+        if ( $error && in_array( $error['type'], array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR ) ) ) {
+            error_log( '[SmartReplyr Fatal Sandbox] ' . print_r( $error, true ) );
+        }
+    }
+    register_shutdown_function( 'smartreplyr_sandbox_shutdown' );
+}
+
 if ( ! function_exists( 'smartreplyr_safe_execute' ) ) {
     function smartreplyr_safe_execute($callback) {
         try {

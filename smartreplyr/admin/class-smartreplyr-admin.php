@@ -76,7 +76,27 @@ class SmartReplyr_Admin {
     }
 
     public function handle_settings() {
-        if ( ! isset( $_POST['smartreplyr_save_settings'] ) || ! current_user_can( 'manage_options' ) ) {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+
+        // Handle Reset Sequence
+        if ( isset( $_POST['smartreplyr_reset_settings'] ) ) {
+            check_admin_referer( 'smartreplyr_settings_action', 'smartreplyr_settings_nonce' );
+            global $wpdb;
+            $table = SmartReplyr_DB::get_settings_table();
+            $wpdb->query("TRUNCATE TABLE $table"); // Clear all user settings safely
+            if ( class_exists('SmartReplyr_Activator') ) {
+                $activator = new ReflectionClass('SmartReplyr_Activator');
+                $method = $activator->getMethod('seed_defaults');
+                $method->setAccessible(true);
+                $method->invoke(null);
+            }
+            add_settings_error( 'smartreplyr_messages', 'smartreplyr_message', 'Settings reset to production defaults successfully.', 'updated' );
+            return;
+        }
+
+        if ( ! isset( $_POST['smartreplyr_save_settings'] ) ) {
             return;
         }
 
@@ -90,11 +110,36 @@ class SmartReplyr_Admin {
             'email_enabled', 'notification_email', 'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_encryption'
         );
 
+        $has_errors = false;
+
         foreach ( $fields as $field ) {
             if ( isset( $_POST[ $field ] ) ) {
                 $val = is_string( $_POST[ $field ] ) ? wp_unslash( $_POST[ $field ] ) : $_POST[ $field ];
                 
-                if ( $field === 'system_prompt' || $field === 'welcome_message' || $field === 'fallback_message' || $field === 'gdpr_text' ) {
+                // Detailed Sanitization checks
+                if ( $field === 'bot_name' && empty( trim($val) ) ) {
+                    add_settings_error( 'smartreplyr_messages', 'smartreplyr_botname_error', 'Bot Name cannot be empty.', 'error' );
+                    $has_errors = true;
+                    continue;
+                }
+                if ( $field === 'webhook_url' && ! empty( $val ) && ! filter_var( $val, FILTER_VALIDATE_URL ) ) {
+                    add_settings_error( 'smartreplyr_messages', 'smartreplyr_webhook_error', 'Invalid Webhook URL format natively.', 'error' );
+                    $has_errors = true;
+                    continue;
+                }
+                if ( $field === 'notification_email' && ! empty( $val ) && ! is_email( $val ) ) {
+                    add_settings_error( 'smartreplyr_messages', 'smartreplyr_email_error', 'Invalid Email format natively.', 'error' );
+                    $has_errors = true;
+                    continue;
+                }
+
+                if ( $field === 'primary_color' ) {
+                    $val = sanitize_hex_color( $val );
+                } elseif ( $field === 'avatar_url' || $field === 'webhook_url' ) {
+                    $val = esc_url_raw( $val );
+                } elseif ( $field === 'notification_email' ) {
+                    $val = sanitize_email( $val );
+                } elseif ( $field === 'system_prompt' || $field === 'welcome_message' || $field === 'fallback_message' || $field === 'gdpr_text' ) {
                     $val = sanitize_textarea_field( $val );
                 } else if ( $field === 'field_mapping' ) {
                     $val = wp_json_encode( is_string( $val ) ? json_decode( $val, true ) : $val );
@@ -104,16 +149,19 @@ class SmartReplyr_Admin {
                     $val = sanitize_text_field( $val );
                 }
                 
-                SmartReplyr_DB::update_setting( $field, $val );
+                if ( ! $has_errors ) {
+                    SmartReplyr_DB::update_setting( $field, $val );
+                }
             } else {
-                // Handle unchecked checkboxes
-                if ( in_array( $field, array( 'gdpr_enabled', 'webhook_enabled', 'email_enabled', 'debug_mode' ) ) ) {
+                if ( ! $has_errors && in_array( $field, array( 'gdpr_enabled', 'webhook_enabled', 'email_enabled', 'debug_mode' ) ) ) {
                     SmartReplyr_DB::update_setting( $field, '0' );
                 }
             }
         }
 
-        add_settings_error( 'smartreplyr_messages', 'smartreplyr_message', 'Settings saved successfully.', 'updated' );
+        if ( ! $has_errors ) {
+            add_settings_error( 'smartreplyr_messages', 'smartreplyr_message', 'Settings successfully saved and validated natively.', 'updated' );
+        }
     }
 
     public function export_csv() {
@@ -186,11 +234,36 @@ class SmartReplyr_Admin {
         wp_send_json_success( 'Deleted successfully.' );
     }
 
+    public function ajax_test_bot() {
+        check_ajax_referer( 'smartreplyr_admin_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Permission denied.' );
+        }
+
+        $question = isset( $_POST['question'] ) ? sanitize_text_field( wp_unslash( $_POST['question'] ) ) : '';
+        if ( empty( $question ) ) {
+            wp_send_json_error( 'Empty payload received natively.' );
+        }
+
+        require_once SMARTREPLYR_PLUGIN_DIR . 'includes/class-smartreplyr-ai.php';
+        $ai = new SmartReplyr_AI();
+        $response = $ai->process_message( 0, $question, '' );
+
+        if ( ! $response ) {
+            wp_send_json_error( 'Engine exception. Check error logs.' );
+        }
+
+        wp_send_json_success( array(
+            'message' => $response['message'],
+            'intent'  => $response['intent'] ?? 'None'
+        ) );
+    }
+
     /* ─── Views ───────────────────────────────── */
 
     public function view_dashboard() { include SMARTREPLYR_PLUGIN_DIR . 'admin/views/admin-dashboard.php'; }
     public function view_leads() { include SMARTREPLYR_PLUGIN_DIR . 'admin/views/admin-leads.php'; }
     public function view_conversations() { include SMARTREPLYR_PLUGIN_DIR . 'admin/views/admin-conversations.php'; }
     public function view_knowledge_base() { include SMARTREPLYR_PLUGIN_DIR . 'admin/views/admin-knowledge-base.php'; }
-    public function view_settings() { include SMARTREPLYR_PLUGIN_DIR . 'admin/views/admin-settings.php'; }
+    public function view_settings() { include SMARTREPLYR_PLUGIN_DIR . 'admin/views/settings-page.php'; }
 }

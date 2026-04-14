@@ -1,3 +1,6 @@
+<?php
+try {
+?>
 <div class="wrap smartreplyr-wrap">
     <h1>SmartReplyr Settings</h1>
     
@@ -12,7 +15,10 @@
     </h2>
     
     <form method="post" action="">
-        <?php wp_nonce_field( 'smartreplyr_settings_action', 'smartreplyr_settings_nonce' ); ?>
+        <?php 
+            settings_fields( 'smartreplyr_settings_group' );
+            wp_nonce_field( 'smartreplyr_settings_action', 'smartreplyr_settings_nonce' ); 
+        ?>
         <input type="hidden" name="smartreplyr_save_settings" value="1">
         <?php $settings = SmartReplyr_DB::get_all_settings(); ?>
         
@@ -40,7 +46,11 @@
                     <th scope="row"><label for="avatar_url">Bot Avatar</label></th>
                     <td>
                         <div style="display:flex; gap:10px; align-items:center;">
-                            <img id="sr-avatar-preview" src="<?php echo esc_url( $settings['avatar_url'] ?: SMARTREPLYR_AI_PLUGIN_URL . 'assets/img/default-avatar.svg' ); ?>" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:1px solid #ccc;">
+                            <?php 
+                                $default_avatar = defined('SMARTREPLYR_PLUGIN_URL') ? SMARTREPLYR_PLUGIN_URL . 'assets/img/default-avatar.svg' : '';
+                                $avatar_img = ! empty( $settings['avatar_url'] ) ? $settings['avatar_url'] : $default_avatar;
+                            ?>
+                            <img id="sr-avatar-preview" src="<?php echo esc_url( $avatar_img ); ?>" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:1px solid #ccc;">
                             <input name="avatar_url" type="text" id="avatar_url" value="<?php echo esc_attr( $settings['avatar_url'] ?? '' ); ?>" class="regular-text">
                             <button type="button" class="button button-secondary" id="sr-upload-avatar">Choose Image</button>
                         </div>
@@ -176,3 +186,8 @@
         <?php submit_button( 'Save Settings' ); ?>
     </form>
 </div>
+<?php
+} catch (Throwable $e) {
+    echo '<div class="notice notice-error"><p><strong>SmartReplyr Safe Execute Warning:</strong> Failed to render settings page: ' . esc_html($e->getMessage()) . '</p></div>';
+}
+?>

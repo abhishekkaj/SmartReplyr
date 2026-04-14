@@ -15,6 +15,8 @@
 8. **Admin Dashboard:** Full dashboard to view overall lead conversion rates, filtering, log viewing, widget customization (color/avatar/UI options), and detailed CSV exports of leads.
 9. **Smart Rule-Based NLP:** Rule based hybrid system detecting intent and similarity index to answer questions natively before falling back to ChatGPT.
 10. **Advanced Phone Validation:** `intl-tel-input` tracks international flags and phone validations beautifully.
+11. **Test Chatbot Simulator:** A robust built-in sandbox located dynamically inside the Admin dashboard, simulating deep webhook integration testing.
+12. **Bulletproof Architecture:** Hardened with modular, safely sandboxed individual UI blocks and a global runtime fatal-error interceptor to enforce site reliability.
 
 ## API Structure
 
@@ -82,6 +84,12 @@ The plugin operates primarily over the WP REST API under the namespace: `smartre
 *   `created_at` (DATETIME)
 
 ## Changelog
+
+### v2.1.0
+- Refactored Admin UI Settings to a highly scalable, dynamic section-component loader.
+- Pushed custom settings validation enforcing safe Webhooks and Escaped JSON formatting.
+- Added deep native Chatbot Test simulator utilizing exact front-end NLP processing inside the configuration board.
+- Bulletproofed plugin lifecycle terminating PHP WSOD with a global sandbox implementation.
 
 ### v2.0.0
 - Complete rebranding from EduLead AI → SmartReplyr
