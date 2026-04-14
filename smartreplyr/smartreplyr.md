@@ -85,6 +85,13 @@ The plugin operates primarily over the WP REST API under the namespace: `smartre
 
 ## Changelog
 
+### v2.2.0
+- **Conversational Lead Capture Pipeline:** Ripped out traditional static block forms and implemented a Drift/Intercom style sequential chat-bot state machine capturing Name, Email, Phone, and Course natively.
+- **Premium Design Overhaul:** Integrated $10M SaaS-level UI elements including deep box shadows, organic gradient launchers, pulsating trigger animations, and dynamic micro-interactions on chat hover.
+- **Human-Feel AI Presence:** Simulated human typing latencies randomly bounding 600-1200ms along with smart message `fadeUp` delays.
+- **Auto-Open UX:** Trigger orb smartly fires conversational greeting after 5 seconds on the page to jump-start visitor interactions automatically.
+- **Dynamic Quick-Reply Chips:** Inject high-conversion prompt chips directly underneath chatbot layout after standard details are received to boost deep question rate.
+
 ### v2.1.0
 - Refactored Admin UI Settings to a highly scalable, dynamic section-component loader.
 - Pushed custom settings validation enforcing safe Webhooks and Escaped JSON formatting.
