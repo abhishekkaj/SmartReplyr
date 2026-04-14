@@ -42,11 +42,11 @@ if ( ! function_exists( 'smartreplyr_safe_execute' ) ) {
 /* ──────────────────────────────────────────────
  * Constants
  * ──────────────────────────────────────────── */
-define( 'SMARTREPLYR_VERSION', '2.0.0' );
+define( 'SMARTREPLYR_VERSION', '2.1.0' );
 define( 'SMARTREPLYR_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SMARTREPLYR_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'SMARTREPLYR_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
-define( 'SMARTREPLYR_DB_VERSION', '2.0.0' );
+define( 'SMARTREPLYR_DB_VERSION', '2.1.0' );
 
 /* ──────────────────────────────────────────────
  * Activation / Deactivation / Uninstall

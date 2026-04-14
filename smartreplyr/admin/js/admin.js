@@ -11,7 +11,7 @@
 
         // --- Avatar Upload (WP Media) ---
         let mediaUploader;
-        $('#sr-upload-avatar').on('click', function(e) {
+        $(document).on('click', '#sr-upload-avatar', function(e) {
             e.preventDefault();
             if (mediaUploader) {
                 mediaUploader.open();
