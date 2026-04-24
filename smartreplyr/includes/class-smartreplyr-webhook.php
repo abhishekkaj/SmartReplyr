@@ -29,7 +29,6 @@ class SmartReplyr_Webhook {
                     'Content-Type' => 'application/json',
                 ),
                 'body'        => wp_json_encode( $payload ),
-                'data_format' => 'body',
             ) );
 
             if ( is_wp_error( $response ) ) {
@@ -53,42 +52,34 @@ class SmartReplyr_Webhook {
 
     /**
      * Build payload with dynamic field mapping.
+     * Iterates through all available lead data and maps keys to the user-defined external names.
      */
     private function build_payload( $lead, $mapping ) {
-        // Default field names
-        $default_fields = array(
-            'name'            => 'name',
-            'phone'           => 'phone',
-            'email'           => 'email',
-            'course_interest' => 'course_interest',
-            'page_url'        => 'page_url',
-            'page_title'      => 'page_title',
-            'referrer'        => 'referrer',
-        );
-
         $payload = array();
 
-        // Map fields
-        foreach ( $default_fields as $internal => $default_external ) {
-            $external = isset( $mapping[ $internal ] ) && ! empty( $mapping[ $internal ] )
-                ? $mapping[ $internal ]
-                : $default_external;
-            $payload[ $external ] = $lead[ $internal ] ?? '';
+        // 1. Map all database columns to external keys if defined in mapping
+        // Internal keys examples: name, phone, email, course_interest, utm_source, page_url etc.
+        foreach ( $lead as $key => $value ) {
+            $external_key = ! empty( $mapping[ $key ] ) ? $mapping[ $key ] : $key;
+            $payload[ $external_key ] = $value;
         }
 
-        // Always include metadata
-        $payload['source']        = 'smartreplyr-ai';
-        $payload['timestamp']     = $lead['created_at'] ?? current_time( 'mysql' );
-        $payload['site_url']      = get_site_url();
+        // 2. Ensure system metadata is always present (unless overridden by mapping)
+        if ( ! isset( $payload['source'] ) ) {
+            $payload['source'] = 'smartreplyr-ai';
+        }
+        if ( ! isset( $payload['site_url'] ) ) {
+            $payload['site_url'] = get_site_url();
+        }
 
-        // UTM parameters
+        // 3. Structured UTM support (legacy support for CRM that expects nested 'utm' object)
         $utm = array();
-        foreach ( array( 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content' ) as $key ) {
-            if ( ! empty( $lead[ $key ] ) ) {
-                $utm[ $key ] = $lead[ $key ];
+        foreach ( array( 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content' ) as $utm_key ) {
+            if ( ! empty( $lead[ $utm_key ] ) ) {
+                $utm[ $utm_key ] = $lead[ $utm_key ];
             }
         }
-        if ( ! empty( $utm ) ) {
+        if ( ! empty( $utm ) && ! isset( $payload['utm'] ) ) {
             $payload['utm'] = $utm;
         }
 

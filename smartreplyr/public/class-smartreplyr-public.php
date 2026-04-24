@@ -8,8 +8,8 @@ class SmartReplyr_Public {
         wp_enqueue_style( 'smartreplyr-widget-css', SMARTREPLYR_PLUGIN_URL . 'public/css/widget.css', array(), SMARTREPLYR_VERSION );
         
         wp_enqueue_script( 'intl-tel-input', 'https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/18.2.1/js/intlTelInput.min.js', array(), null, true );
-        // Lazy load the JS widget by adding defer attribute later
-        wp_enqueue_script( 'smartreplyr-widget-js', SMARTREPLYR_PLUGIN_URL . 'public/js/widget.js', array('intl-tel-input'), SMARTREPLYR_VERSION, true );
+        // Removed hard dependency to ensure widget shows even if CDN is blocked
+        wp_enqueue_script( 'smartreplyr-widget-js', SMARTREPLYR_PLUGIN_URL . 'public/js/widget.js', array(), SMARTREPLYR_VERSION, true );
         
         $settings = SmartReplyr_DB::get_all_settings();
         
@@ -27,7 +27,7 @@ class SmartReplyr_Public {
             'utm_source'    => isset( $_GET['utm_source'] ) ? sanitize_text_field( $_GET['utm_source'] ) : '',
             'utm_medium'    => isset( $_GET['utm_medium'] ) ? sanitize_text_field( $_GET['utm_medium'] ) : '',
             'utm_campaign'  => isset( $_GET['utm_campaign'] ) ? sanitize_text_field( $_GET['utm_campaign'] ) : '',
-            'page_title'    => get_the_title(),
+            'page_title'    => get_the_title() ?: get_bloginfo('name'),
         ) );
     }
 

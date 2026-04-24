@@ -4,14 +4,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Apply primary color variable
     document.documentElement.style.setProperty('--sr-primary', smartreplyrConfig.primary_color);
 
-    const root = document.getElementById('smartreplyr-widget-root');
-    root.classList.add(smartreplyrConfig.position);
-
     // PERSISTENCE CHECK
     let leadId = localStorage.getItem('smartreplyr_lead_id');
     let isLeadSubmitted = localStorage.getItem('smartreplyr_lead_submitted') === 'true';
 
-    // Build Widget HTML
+    // Build Widget HTML Template
     const widgetHtml = `
         <div class="sr-widget-window">
             <div class="sr-widget-header">
@@ -99,222 +96,197 @@ document.addEventListener('DOMContentLoaded', function() {
         </button>
     `;
 
-    root.innerHTML = widgetHtml;
+    const initWidget = () => {
+        const root = document.getElementById('smartreplyr-widget-root');
+        if (!root) {
+            if (!window._sr_retried) {
+                window._sr_retried = true;
+                setTimeout(initWidget, 500);
+            } else {
+                console.warn('SmartReplyr: Root element not found (#smartreplyr-widget-root)');
+            }
+            return;
+        }
 
-    // DOM Elements
-    const triggerBtn = document.getElementById('sr-trigger-btn');
-    const leadForm = document.getElementById('sr-lead-form');
-    const leadFormView = document.getElementById('sr-lead-form-view');
-    const successView = document.getElementById('sr-success-view');
-    const chatView = document.getElementById('sr-chat-view');
-    const messagesContainer = document.getElementById('sr-messages-container');
-    const chatForm = document.getElementById('sr-chat-form');
-    const msgInput = document.getElementById('sr_chat_msg');
-    const submitBtn = document.getElementById('sr-submit-btn');
-    const phoneInput = document.getElementById('sr-phone');
+        root.classList.add(smartreplyrConfig.position);
+        root.innerHTML = widgetHtml;
+        setupListeners(root);
+    };
 
-    let hasOpened = false;
-    let isTyping = false;
-    let iti;
+    const setupListeners = (root) => {
+        const triggerBtn = document.getElementById('sr-trigger-btn');
+        const leadForm = document.getElementById('sr-lead-form');
+        const leadFormView = document.getElementById('sr-lead-form-view');
+        const successView = document.getElementById('sr-success-view');
+        const chatView = document.getElementById('sr-chat-view');
+        const messagesContainer = document.getElementById('sr-messages-container');
+        const chatForm = document.getElementById('sr-chat-form');
+        const msgInput = document.getElementById('sr_chat_msg');
+        const submitBtn = document.getElementById('sr-submit-btn');
+        const phoneInput = document.getElementById('sr-phone');
 
-    // Initialize ITI
-    if (window.intlTelInput) {
-        iti = window.intlTelInput(phoneInput, {
-            initialCountry: "auto",
-            geoIpLookup: function(success, failure) {
-                fetch("https://ipapi.co/json")
-                    .then(res => res.json())
-                    .then(data => success(data.country_code))
-                    .catch(() => success("us"));
-            },
-            utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/18.2.1/js/utils.js"
-        });
-    }
+        let hasOpened = false;
+        let isTyping = false;
+        let iti;
 
-    // Toggle Widget
-    triggerBtn.addEventListener('click', () => {
-        root.classList.toggle('is-open');
-        if (root.classList.contains('is-open')) {
-            if (!hasOpened) {
-                hasOpened = true;
-                if (isLeadSubmitted) {
-                    initiateChat();
+        // Initialize ITI (safe check)
+        if (window.intlTelInput && phoneInput) {
+            iti = window.intlTelInput(phoneInput, {
+                initialCountry: "auto",
+                geoIpLookup: function(success, failure) {
+                    fetch("https://ipapi.co/json")
+                        .then(res => res.json())
+                        .then(data => success(data.country_code))
+                        .catch(() => success("us"));
+                },
+                utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/18.2.1/js/utils.js"
+            });
+        }
+
+        // Toggle Widget
+        triggerBtn.addEventListener('click', () => {
+            root.classList.toggle('is-open');
+            if (root.classList.contains('is-open')) {
+                if (!hasOpened) {
+                    hasOpened = true;
+                    if (isLeadSubmitted) {
+                        initiateChat(messagesContainer);
+                    }
                 }
             }
-        }
-    });
+        });
 
-    // Auto-Open (5s)
-    setTimeout(() => {
-        if (!root.classList.contains('is-open') && !hasOpened) {
-            triggerBtn.click();
-        }
-    }, 5000);
-
-    // LEAD SUBMISSION
-    leadForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const btnText = submitBtn.querySelector('.btn-text');
-        const loader = submitBtn.querySelector('.sr-loader');
-        
-        // Prevent duplicate
-        submitBtn.disabled = true;
-        btnText.classList.add('sr-hidden');
-        loader.classList.remove('sr-hidden');
-
-        const formData = new FormData(leadForm);
-        const fullPhone = iti ? iti.getNumber() : formData.get('phone');
-
-        const payload = {
-            name: formData.get('name'),
-            email: formData.get('email'),
-            phone: fullPhone,
-            course_interest: formData.get('course'),
-            consent: 1,
-            page_url: window.location.href,
-            page_title: smartreplyrConfig.page_title,
-            referrer: document.referrer
-        };
-
-        // Timeout controller
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 7000);
-
-        try {
-            const res = await fetch(`${smartreplyrConfig.api_url}/lead`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-SR-Nonce': smartreplyrConfig.nonce 
-                },
-                body: JSON.stringify(payload),
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            
-            const data = await res.json();
-            if (data.success) {
-                transitionToSuccess(data.lead_id);
-            } else {
-                throw new Error(data.message || 'Submission failed');
+        // Auto-Open (5s)
+        setTimeout(() => {
+            if (!root.classList.contains('is-open') && !hasOpened) {
+                triggerBtn.click();
             }
-        } catch (err) {
-            console.error('Submission error:', err);
-            // Fallback success for UX (silent background retry happens in prod usually)
-            if (err.name === 'AbortError') {
-                transitionToSuccess(999); // Mock ID for fallback
-            } else {
-                const errMsg = (err.message && err.message !== 'Submission failed' && err.message !== 'Failed to fetch') 
-                    ? err.message 
-                    : 'Something went wrong. Please check your connection.';
-                alert(errMsg);
+        }, 5000);
+
+        // LEAD SUBMISSION
+        leadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btnText = submitBtn.querySelector('.btn-text');
+            const loader = submitBtn.querySelector('.sr-loader');
+            
+            submitBtn.disabled = true;
+            btnText.classList.add('sr-hidden');
+            loader.classList.remove('sr-hidden');
+
+            const formData = new FormData(leadForm);
+            const fullPhone = iti ? iti.getNumber() : formData.get('phone');
+
+            const payload = {
+                name: formData.get('name'),
+                email: formData.get('email'),
+                phone: fullPhone,
+                course_interest: formData.get('course'),
+                consent: 1,
+                page_url: window.location.href,
+                page_title: smartreplyrConfig.page_title,
+                referrer: document.referrer
+            };
+
+            try {
+                const res = await fetch(`${smartreplyrConfig.api_url}/lead`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-SR-Nonce': smartreplyrConfig.nonce },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                    leadId = data.lead_id;
+                    isLeadSubmitted = true;
+                    localStorage.setItem('smartreplyr_lead_id', leadId);
+                    localStorage.setItem('smartreplyr_lead_submitted', 'true');
+                    
+                    leadFormView.classList.add('sr-hidden');
+                    successView.classList.remove('sr-hidden');
+
+                    setTimeout(() => {
+                        successView.classList.add('sr-hidden');
+                        chatView.classList.remove('sr-hidden');
+                        initiateChat(messagesContainer);
+                    }, 2000);
+                } else {
+                    throw new Error(data.message || 'Submission failed');
+                }
+            } catch (err) {
+                alert(err.message || 'Something went wrong. Please check your connection.');
                 submitBtn.disabled = false;
                 btnText.classList.remove('sr-hidden');
                 loader.classList.add('sr-hidden');
             }
+        });
+
+        // CHAT LOGIC
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msg = msgInput.value.trim();
+            if (!msg || isTyping) return;
+
+            appendUserMessage(messagesContainer, msg);
+            msgInput.value = '';
+            
+            await askAI(messagesContainer, msg);
+        });
+
+        // Focus fix
+        msgInput.addEventListener('focus', () => {
+            if (window.innerWidth < 480) {
+                setTimeout(() => messagesContainer.scrollTop = messagesContainer.scrollHeight, 300);
+            }
+        });
+    };
+
+    function initiateChat(container) {
+        if (container.children.length === 0) {
+            appendBotMessage(container, smartreplyrConfig.welcome_message);
+            enqueueSmartPrompts(container);
         }
-    });
-
-    function transitionToSuccess(newLeadId) {
-        leadId = newLeadId;
-        isLeadSubmitted = true;
-        localStorage.setItem('smartreplyr_lead_id', leadId);
-        localStorage.setItem('smartreplyr_lead_submitted', 'true');
-
-        leadFormView.classList.add('sr-hidden');
-        successView.classList.remove('sr-hidden');
-
-        setTimeout(() => {
-            successView.classList.add('sr-hidden');
-            chatView.classList.remove('sr-hidden');
-            initiateChat();
-        }, 2000);
     }
 
-    function initiateChat() {
-        if (messagesContainer.children.length === 0) {
-            appendBotMessage(smartreplyrConfig.welcome_message);
-            enqueueSmartPrompts();
-        }
-    }
-
-    // CHAT LOGIC
-    chatForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const msg = msgInput.value.trim();
-        if (!msg || isTyping) return;
-
-        appendUserMessage(msg);
-        msgInput.value = '';
-        
-        await askAI(msg);
-    });
-
-    async function askAI(msg) {
-        const tId = showTypingIndicator();
+    async function askAI(container, msg) {
+        const tId = showTypingIndicator(container);
         try {
             const res = await fetch(`${smartreplyrConfig.api_url}/chat`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-SR-Nonce': smartreplyrConfig.nonce 
-                },
-                body: JSON.stringify({
-                    lead_id: leadId,
-                    message: msg,
-                    page_context: window.location.href
-                })
+                headers: { 'Content-Type': 'application/json', 'X-SR-Nonce': smartreplyrConfig.nonce },
+                body: JSON.stringify({ lead_id: leadId, message: msg, page_context: window.location.href })
             });
             const data = await res.json();
-            removeTypingIndicator(tId);
+            document.getElementById(tId)?.remove();
             
             if (data.success) {
-                appendBotMessage(data.reply);
+                appendBotMessage(container, data.reply);
             } else {
-                appendBotMessage("I'm having trouble connecting. Please try again in a moment.");
+                appendBotMessage(container, "I'm having trouble connecting. Please try again.");
             }
         } catch (err) {
-            removeTypingIndicator(tId);
-            appendBotMessage("Network error. Please check your internet connection.");
+            document.getElementById(tId)?.remove();
+            appendBotMessage(container, "Network error. Please check your connection.");
         }
     }
 
-    // UI HELPERS
-    function appendUserMessage(text) {
-        messagesContainer.insertAdjacentHTML('beforeend', `<div class="sr-msg sr-message sr-msg-user">${escapeHtml(text)}</div>`);
-        scrollToBottom();
+    function appendUserMessage(container, text) {
+        container.insertAdjacentHTML('beforeend', `<div class="sr-msg sr-message sr-msg-user">${escapeHtml(text)}</div>`);
+        container.scrollTop = container.scrollHeight;
     }
 
-    function appendBotMessage(text) {
-        messagesContainer.insertAdjacentHTML('beforeend', `<div class="sr-msg sr-message sr-msg-bot">${formatMarkdown(text)}</div>`);
-        scrollToBottom();
+    function appendBotMessage(container, text) {
+        container.insertAdjacentHTML('beforeend', `<div class="sr-msg sr-message sr-msg-bot">${formatMarkdown(text)}</div>`);
+        container.scrollTop = container.scrollHeight;
     }
 
-    function showTypingIndicator() {
-        isTyping = true;
+    function showTypingIndicator(container) {
         const id = 'typing-' + Date.now();
-        messagesContainer.insertAdjacentHTML('beforeend', `
-            <div class="sr-msg sr-message sr-msg-bot" id="${id}">
-                <div class="sr-typing"><span></span><span></span><span></span></div>
-            </div>
-        `);
-        scrollToBottom();
+        container.insertAdjacentHTML('beforeend', `<div class="sr-msg sr-message sr-msg-bot" id="${id}"><div class="sr-typing"><span></span><span></span><span></span></div></div>`);
+        container.scrollTop = container.scrollHeight;
         return id;
     }
 
-    function removeTypingIndicator(id) {
-        isTyping = false;
-        const el = document.getElementById(id);
-        if (el) el.remove();
-    }
-
-    function scrollToBottom() {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-
-    function enqueueSmartPrompts() {
-        const delay = 1500;
+    function enqueueSmartPrompts(container) {
         setTimeout(() => {
             const prompts = `
                 <div class="sr-quick-replies">
@@ -323,16 +295,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button class="sr-chip" onclick="window.srQuickSend('How to apply?')">Apply Now</button>
                 </div>
             `;
-            messagesContainer.insertAdjacentHTML('beforeend', prompts);
-            scrollToBottom();
-        }, delay);
+            container.insertAdjacentHTML('beforeend', prompts);
+            container.scrollTop = container.scrollHeight;
+        }, 1500);
     }
 
     window.srQuickSend = function(val) {
-        msgInput.value = val;
-        chatForm.dispatchEvent(new Event('submit'));
-        // Remove chips
-        document.querySelector('.sr-quick-replies')?.remove();
+        const input = document.getElementById('sr_chat_msg');
+        if (input) {
+            input.value = val;
+            document.getElementById('sr-chat-form').dispatchEvent(new Event('submit'));
+            document.querySelector('.sr-quick-replies')?.remove();
+        }
     };
 
     function escapeHtml(unsafe) {
@@ -349,10 +323,5 @@ document.addEventListener('DOMContentLoaded', function() {
         return `<p>${html}</p>`;
     }
 
-    // MOBILE FOCUS FIX
-    msgInput.addEventListener('focus', () => {
-        if (window.innerWidth < 480) {
-            setTimeout(scrollToBottom, 300);
-        }
-    });
+    initWidget();
 });
