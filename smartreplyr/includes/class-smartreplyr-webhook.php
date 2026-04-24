@@ -22,21 +22,28 @@ class SmartReplyr_Webhook {
 
             // Send POST request
             $response = wp_remote_post( $webhook_url, array(
-                'timeout' => 15,
-                'headers' => array(
+                'timeout'     => 15,
+                'sslverify'   => false,
+                'user-agent'  => 'SmartReplyr-Webhook/1.0',
+                'headers'     => array(
                     'Content-Type' => 'application/json',
                 ),
-                'body'    => wp_json_encode( $payload ),
+                'body'        => wp_json_encode( $payload ),
+                'data_format' => 'body',
             ) );
 
             if ( is_wp_error( $response ) ) {
-                error_log( 'SmartReplyr Webhook Error: ' . $response->get_error_message() );
+                $err_msg = $response->get_error_message();
+                SmartReplyr_DB::add_log('webhook', 'external', 'failed', "Webhook cURL Error: " . $err_msg, array('lead_id' => $lead['id'] ?? 0));
+                error_log( 'SmartReplyr Webhook Error: ' . $err_msg );
                 return false;
             }
 
             $code = wp_remote_retrieve_response_code( $response );
             if ( $code < 200 || $code >= 300 ) {
-                error_log( 'SmartReplyr Webhook HTTP ' . $code . ': ' . wp_remote_retrieve_body( $response ) );
+                $body_resp = wp_remote_retrieve_body( $response );
+                SmartReplyr_DB::add_log('webhook', 'external', 'failed', "Webhook HTTP $code: " . $body_resp, array('lead_id' => $lead['id'] ?? 0));
+                error_log( 'SmartReplyr Webhook HTTP ' . $code . ': ' . $body_resp );
                 return false;
             }
 

@@ -30,6 +30,7 @@ class SmartReplyr_DB {
     public static function get_conversations_table() { return self::get_table_name('smartreplyr_conversations', 'edulead_conversations'); }
     public static function get_settings_table() { return self::get_table_name('smartreplyr_settings', 'edulead_settings'); }
     public static function get_kb_table() { return self::get_table_name('smartreplyr_knowledge_base', 'edulead_knowledge_base'); }
+    public static function get_logs_table() { return self::get_table_name('smartreplyr_logs', 'smartreplyr_logs'); }
 
     /* ─── Settings ────────────────────────────── */
 
@@ -295,5 +296,43 @@ class SmartReplyr_DB {
              LIMIT %d",
             $like, $like, $like, $like, $like, $limit
         ), ARRAY_A );
+    }
+
+    /* ─── Logs & Maintenance ─────────────────── */
+
+    public static function add_log( $type, $source, $status, $message, $data = array() ) {
+        global $wpdb;
+        $table = self::get_logs_table();
+        $wpdb->insert( $table, array(
+            'type'       => sanitize_text_field( $type ),
+            'source'     => sanitize_text_field( $source ),
+            'status'     => sanitize_text_field( $status ),
+            'message'    => sanitize_textarea_field( $message ),
+            'data'       => wp_json_encode( $data ),
+            'created_at' => current_time( 'mysql' ),
+        ) );
+        
+        // Self-rotate after insertion (1% chance to keep it light)
+        if ( rand( 1, 100 ) === 1 ) {
+            self::rotate_logs();
+        }
+    }
+
+    public static function rotate_logs() {
+        global $wpdb;
+        $table = self::get_logs_table();
+        
+        // 1. Delete logs older than 14 days
+        $wpdb->query( $wpdb->prepare(
+            "DELETE FROM $table WHERE created_at < %s",
+            date( 'Y-m-d H:i:s', strtotime( '-14 days' ) )
+        ) );
+        
+        // 2. Cap at 5000 rows
+        $count = intval( $wpdb->get_var( "SELECT COUNT(*) FROM $table" ) );
+        if ( $count > 5000 ) {
+            $limit = $count - 5000;
+            $wpdb->query( "DELETE FROM $table ORDER BY created_at ASC LIMIT $limit" );
+        }
     }
 }

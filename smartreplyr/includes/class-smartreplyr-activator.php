@@ -97,9 +97,25 @@ class SmartReplyr_Activator {
             PRIMARY KEY  (id)
         ) $charset;";
 
+        // ── Logs ────────────────────────────────────
+        $sql_logs = "CREATE TABLE {$prefix}smartreplyr_logs (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            type VARCHAR(50) NOT NULL,
+            source VARCHAR(100) NOT NULL,
+            status VARCHAR(50) NOT NULL,
+            message TEXT NOT NULL,
+            data LONGTEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY idx_type (type),
+            KEY idx_source (source),
+            KEY idx_status (status),
+            KEY idx_created (created_at)
+        ) $charset;";
+
         $wpdb->hide_errors();
         
-        $queries = array( $sql_leads, $sql_conversations, $sql_settings, $sql_kb );
+        $queries = array( $sql_leads, $sql_conversations, $sql_settings, $sql_kb, $sql_logs );
         foreach ( $queries as $query ) {
             dbDelta( $query );
             if ( ! empty( $wpdb->last_error ) ) {
