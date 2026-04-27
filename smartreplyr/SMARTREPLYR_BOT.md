@@ -138,6 +138,16 @@ Go to **WordPress Admin > SmartReplyr > Settings** to find these tabs:
 | Password | App password (not your regular password for Gmail) |
 | Encryption | TLS or SSL |
 
+### Tab 5: Form Builder
+This tab allows you to completely customize the lead capture form:
+- **Drag and Drop:** Reorder fields by dragging them up or down.
+- **Visibility:** Hide/show any field using the toggle switch.
+- **Requirement:** Mark any field as required or optional.
+- **Supported Fields:** Add custom fields like Text, Email, Phone, Number, Dropdown, Textarea, and Checkbox.
+- **Data Storage:** All custom field values are stored in the database (`meta_data` column) and can be seen in the Leads list.
+
+> ⚠️ **Core Fields:** Name, Email, Phone, and Course Interest are "Core" fields. They are optimized for the system and cannot be deleted, but you can hide or reorder them.
+
 > ⚠️ **Gmail users:** You must use an **App Password**, not your regular Gmail password. Enable 2-factor authentication on your Google account first.
 
 ---

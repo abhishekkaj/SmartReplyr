@@ -13,13 +13,14 @@
 6. **Email Notifications** — HTML email sent on lead capture via wp_mail or custom SMTP.
 7. **UTM & Lead Source Tracking** — Full UTM parameter capture + custom lead source field.
 8. **Tab-Aware Admin UI** — Settings organized by tabs; saving one tab never overwrites another.
-9. **Guest Visibility Hardened** — High-priority hooks ensure the widget loads on sites behind caches, security layers, or password protection.
-10. **GDPR Consent** — Configurable consent checkbox on the lead form.
-11. **Mobile Close Button** — X button in chatbot header for mobile users.
-12. **Quick Reply Chips** — Customizable suggested prompts shown after lead capture.
-13. **Custom Avatar & Branding** — WP Media Library integration for bot avatar; color picker for primary color.
-14. **Debug & Log System** — All AI responses, webhook deliveries, and email attempts are logged in a dedicated DB table viewable in the admin.
-15. **CSV Export** — All leads exportable to CSV from the admin dashboard.
+9. **Form Builder** — Add, remove, reorder, and customize form fields (Text, Email, Tel, Number, Select, Textarea, Checkbox).
+10. **Guest Visibility Hardened** — High-priority hooks ensure the widget loads on sites behind caches, security layers, or password protection.
+11. **GDPR Consent** — Configurable consent checkbox on the lead form.
+12. **Mobile Close Button** — X button in chatbot header for mobile users.
+13. **Quick Reply Chips** — Customizable suggested prompts shown after lead capture.
+14. **Custom Avatar & Branding** — WP Media Library integration for bot avatar; color picker for primary color.
+15. **Debug & Log System** — All AI responses, webhook deliveries, and email attempts are logged in a dedicated DB table viewable in the admin.
+16. **CSV Export** — All leads exportable to CSV from the admin dashboard.
 
 ## How the AI Works (No API Key Required)
 
@@ -70,11 +71,14 @@ Namespace: `smartreplyr/v1`
 ### Email & SMTP
 `email_enabled`, `notification_email`, `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `smtp_encryption`
 
+### Form Builder
+`form_fields` (JSON)
+
 ## Database Tables (5 Total)
 
 | Table | Purpose |
 |-------|---------|
-| `wp_smartreplyr_leads` | Lead data + UTM + consent + sending status |
+| `wp_smartreplyr_leads` | Lead data + UTM + consent + sending status + **meta_data** (custom fields) |
 | `wp_smartreplyr_conversations` | Full JSON chat history per lead |
 | `wp_smartreplyr_settings` | All plugin configuration (key-value) |
 | `wp_smartreplyr_knowledge_base` | Q&A entries that power the offline AI |
@@ -86,6 +90,7 @@ Namespace: `smartreplyr/v1`
 - **Offline AI Engine:** Complete NLP overhaul using BM25/TF-IDF scoring, synonym expansion, n-gram phrase matching, intent detection, and morphological stemming — works 100% without OpenAI API.
 - **Fluent Response Generator:** KB answers are now transformed into personalized, conversational replies with lead's name, course context, and CTAs.
 - **Smart Fallback Layer:** Handles greetings, thank-you messages, and contact requests intelligently without any KB entry.
+- **Form Builder:** Complete drag-and-drop interface to add/remove/reorder form fields with support for 7+ field types.
 - **Customizable Quick Prompts:** Admin can now define suggested chips from the backend.
 
 ### v2.2.2
