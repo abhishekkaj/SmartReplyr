@@ -3,7 +3,7 @@
  * Plugin Name:       SmartReplyr
  * Plugin URI:        https://github.com/abhishekjha/smartreplyr
  * Description:       Turn Visitors Into Leads Automatically. Captures leads first, then answers queries using website + custom knowledge base data.
- * Version:           2.0.0
+ * Version:           2.2.2
  * Author:            Abhishek Jha
  * Author URI:        
  * License:           GPL-2.0+
