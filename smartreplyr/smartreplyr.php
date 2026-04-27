@@ -3,7 +3,7 @@
  * Plugin Name:       SmartReplyr
  * Plugin URI:        https://github.com/abhishekjha/smartreplyr
  * Description:       Turn Visitors Into Leads Automatically. Captures leads first, then answers queries using website + custom knowledge base data.
- * Version:           2.2.2
+ * Version:           2.0.0
  * Author:            Abhishek Jha
  * Author URI:        
  * License:           GPL-2.0+
@@ -101,13 +101,10 @@ function smartreplyr_run()
     $loader->add_action('wp_ajax_smartreplyr_save_kb', $admin, 'ajax_save_kb');
     $loader->add_action('wp_ajax_smartreplyr_delete_kb', $admin, 'ajax_delete_kb');
 
-    // Public hooks - Increased priority to ensure loading early
+    // Public hooks
     $public = new SmartReplyr_Public();
-    $loader->add_action('wp_enqueue_scripts', $public, 'enqueue_assets', 1);
-    $loader->add_action('wp_footer', $public, 'render_widget', 1);
-    
-    // Fallback for themes that support wp_body_open
-    $loader->add_action('wp_body_open', $public, 'render_widget', 1);
+    $loader->add_action('wp_enqueue_scripts', $public, 'enqueue_assets');
+    $loader->add_action('wp_footer', $public, 'render_widget');
 
     // Shortcodes
     add_shortcode('smartreplyr_chat', array($public, 'render_shortcode'));
@@ -121,4 +118,4 @@ function smartreplyr_run()
         $loader->run();
     });
 }
-add_action('plugins_loaded', 'smartreplyr_run');
+smartreplyr_run();
