@@ -102,13 +102,17 @@ class SmartReplyr_Admin {
 
         check_admin_referer( 'smartreplyr_settings_action', 'smartreplyr_settings_nonce' );
 
-        $fields = array(
-            'bot_name', 'primary_color', 'chat_position', 'welcome_message', 'fallback_message',
-            'courses_list', 'gdpr_enabled', 'gdpr_text', 'avatar_url', 'debug_mode',
-            'openai_api_key', 'openai_model', 'system_prompt',
-            'webhook_enabled', 'webhook_url', 'field_mapping',
-            'email_enabled', 'notification_email', 'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_encryption'
+        $active_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['active_tab'] ) : 'general';
+
+        // Map fields to their respective tabs to prevent cross-tab overwrites
+        $tab_fields_map = array(
+            'general' => array( 'bot_name', 'openai_api_key', 'openai_model', 'system_prompt', 'welcome_message', 'fallback_message', 'debug_mode', 'gdpr_enabled', 'gdpr_text' ),
+            'avatar'  => array( 'avatar_url', 'primary_color', 'chat_position', 'courses_list' ),
+            'crm'     => array( 'webhook_enabled', 'webhook_url', 'field_mapping' ),
+            'email'   => array( 'email_enabled', 'notification_email', 'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_encryption' ),
         );
+
+        $fields = isset( $tab_fields_map[ $active_tab ] ) ? $tab_fields_map[ $active_tab ] : $tab_fields_map['general'];
 
         $has_errors = false;
 
@@ -142,7 +146,8 @@ class SmartReplyr_Admin {
                 } elseif ( $field === 'system_prompt' || $field === 'welcome_message' || $field === 'fallback_message' || $field === 'gdpr_text' ) {
                     $val = sanitize_textarea_field( $val );
                 } else if ( $field === 'field_mapping' ) {
-                    $val = wp_json_encode( is_string( $val ) ? json_decode( $val, true ) : $val );
+                    $decoded = json_decode( $val, true );
+                    $val = wp_json_encode( is_array( $decoded ) ? $decoded : array() );
                 } else if ( in_array( $field, array( 'gdpr_enabled', 'webhook_enabled', 'email_enabled', 'debug_mode' ) ) ) {
                     $val = '1';
                 } else {
@@ -153,6 +158,7 @@ class SmartReplyr_Admin {
                     SmartReplyr_DB::update_setting( $field, $val );
                 }
             } else {
+                // If it's a checkbox and NOT set, update to '0' ONLY IF we are on the tab that contains it
                 if ( ! $has_errors && in_array( $field, array( 'gdpr_enabled', 'webhook_enabled', 'email_enabled', 'debug_mode' ) ) ) {
                     SmartReplyr_DB::update_setting( $field, '0' );
                 }

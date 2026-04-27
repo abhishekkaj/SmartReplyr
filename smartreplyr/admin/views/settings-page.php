@@ -68,6 +68,7 @@ if ( ! function_exists('smartreplyr_render_section') ) {
             wp_nonce_field( 'smartreplyr_settings_action', 'smartreplyr_settings_nonce' ); 
         ?>
         <input type="hidden" name="smartreplyr_save_settings" value="1">
+        <input type="hidden" name="active_tab" value="<?php echo esc_attr($active_tab); ?>">
         
         <div class="sr-settings-content" style="margin-top:20px; background: #fff; padding: 20px; border: 1px solid #ccc;">
             <?php
