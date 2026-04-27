@@ -207,35 +207,41 @@ class SmartReplyr_REST_API {
             );
 
             // Try rule-based NLP match first
-            $nlp_match = SmartReplyr_NLP::match_query( $message );
+            $nlp_match = SmartReplyr_NLP::match_query( $message, $lead );
             $reply = null;
             
             $debug_mode = SmartReplyr_DB::get_setting( 'debug_mode', '0' );
             $debug_info = array();
 
             if ( $nlp_match && ! empty( $nlp_match['answer'] ) ) {
-                $reply = wp_kses_post( $nlp_match['answer'] );
-                SmartReplyr_DB::add_log('chat', 'nlp', 'success', "NLP match found for lead #$lead_id", array('query' => $message, 'reply' => $reply));
+                // Generate a fluent, personalized response from the matched KB entry
+                $reply = SmartReplyr_NLP::generate_response( $nlp_match, $lead, $messages );
+                SmartReplyr_DB::add_log('chat', 'nlp', 'success', "NLP match found for lead #$lead_id (score: " . ( $nlp_match['_match_score'] ?? 'n/a' ) . ")", array('query' => $message));
                 if ( $debug_mode === '1' ) {
                     $debug_info = array(
-                        'source'    => 'nlp',
-                        'intent'    => $nlp_match['intent_detected'] ?? 'none',
-                        'score'     => $nlp_match['match_score'] ?? 0,
+                        'source'    => 'nlp_engine',
+                        'intent'    => $nlp_match['_intent'] ?? 'none',
+                        'score'     => $nlp_match['_match_score'] ?? 0,
+                        'matched_q' => $nlp_match['question'] ?? '',
                     );
                 }
             } else {
-                // Get AI response
-                $ai = new SmartReplyr_AI();
-                $reply = $ai->get_response( $message, $messages, $page_context, $lead );
-                
-                if ( ! empty( $reply ) && strpos($reply, 'error') === false ) {
-                    SmartReplyr_DB::add_log('chat', 'ai_processor', 'success', "AI response generated for lead #$lead_id", array('query' => $message));
+                // Try OpenAI if API key is configured
+                $api_key = SmartReplyr_DB::get_setting( 'openai_api_key', '' );
+                if ( ! empty( $api_key ) ) {
+                    $ai = new SmartReplyr_AI();
+                    $reply = $ai->get_response( $message, $messages, $page_context, $lead );
+                    SmartReplyr_DB::add_log('chat', 'ai_processor', 'success', "OpenAI response for lead #$lead_id", array('query' => $message));
+                    if ( $debug_mode === '1' ) {
+                        $debug_info = array( 'source' => 'openai' );
+                    }
                 } else {
-                    SmartReplyr_DB::add_log('chat', 'ai_processor', 'failed', "AI failed to generate response for lead #$lead_id", array('query' => $message));
-                }
-
-                if ( $debug_mode === '1' ) {
-                    $debug_info = array( 'source' => 'openai' );
+                    // No API key & no NLP match → use smart offline fallback
+                    $reply = SmartReplyr_NLP::smart_fallback( $message, $lead, $messages );
+                    SmartReplyr_DB::add_log('chat', 'nlp_fallback', 'success', "Smart fallback used for lead #$lead_id", array('query' => $message));
+                    if ( $debug_mode === '1' ) {
+                        $debug_info = array( 'source' => 'smart_fallback' );
+                    }
                 }
             }
 
