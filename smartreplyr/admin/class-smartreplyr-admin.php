@@ -106,7 +106,7 @@ class SmartReplyr_Admin {
 
         // Map fields to their respective tabs to prevent cross-tab overwrites
         $tab_fields_map = array(
-            'general' => array( 'bot_name', 'openai_api_key', 'openai_model', 'system_prompt', 'welcome_message', 'fallback_message', 'debug_mode', 'gdpr_enabled', 'gdpr_text' ),
+            'general' => array( 'bot_name', 'openai_api_key', 'openai_model', 'system_prompt', 'welcome_message', 'fallback_message', 'quick_prompts', 'debug_mode', 'gdpr_enabled', 'gdpr_text' ),
             'avatar'  => array( 'avatar_url', 'primary_color', 'chat_position', 'courses_list' ),
             'crm'     => array( 'webhook_enabled', 'webhook_url', 'lead_source', 'field_mapping' ),
             'email'   => array( 'email_enabled', 'notification_email', 'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_encryption' ),

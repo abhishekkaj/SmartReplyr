@@ -22,6 +22,7 @@ $settings = wp_parse_args($settings, array(
     'smtp_username' => '',
     'smtp_password' => '',
     'courses_list' => '',
+    'quick_prompts' => 'View Courses,Fee Structure,Apply Now',
     'gdpr_enabled' => '1',
     'gdpr_text' => '',
     'debug_mode' => '0'

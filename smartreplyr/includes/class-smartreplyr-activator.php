@@ -152,6 +152,7 @@ class SmartReplyr_Activator {
             'gdpr_enabled'      => '1',
             'gdpr_text'         => 'I consent to having my data collected and stored.',
             'courses_list'      => 'MBA,BBA,B.Tech,M.Tech,BCA,MCA,B.Sc,M.Sc,Other',
+            'quick_prompts'     => 'View Courses,Fee Structure,Apply Now',
             'avatar_url'        => '',
             'debug_mode'        => '0',
             'system_prompt'     => 'You are an AI education counselor for {{institute_name}}. Answer student queries about courses, fees, admissions, and campus. Be helpful, concise, and encourage the student to visit or apply. Use the knowledge base context provided. If you don\'t know the answer, say so politely and suggest contacting the admissions office.',

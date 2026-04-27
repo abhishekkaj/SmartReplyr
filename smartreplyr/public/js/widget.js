@@ -296,16 +296,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function enqueueSmartPrompts(container) {
         setTimeout(() => {
+            const promptsList = (smartreplyrConfig.quick_prompts && smartreplyrConfig.quick_prompts.length > 0) 
+                ? smartreplyrConfig.quick_prompts 
+                : ['View Courses', 'Fee Structure', 'How to Apply?'];
+
             const prompts = `
                 <div class="sr-quick-replies">
-                    <button class="sr-chip" onclick="window.srQuickSend('What courses do you offer?')">View Courses</button>
-                    <button class="sr-chip" onclick="window.srQuickSend('What is the fee structure?')">Fee Structure</button>
-                    <button class="sr-chip" onclick="window.srQuickSend('How to apply?')">Apply Now</button>
+                    ${promptsList.map(p => `<button class="sr-chip" onclick="window.srQuickSend('${escapeJs(p)}')">${escapeHtml(p)}</button>`).join('')}
                 </div>
             `;
             container.insertAdjacentHTML('beforeend', prompts);
             container.scrollTop = container.scrollHeight;
         }, 1500);
+    }
+
+    function escapeJs(str) {
+        return str.replace(/'/g, "\\'");
     }
 
     window.srQuickSend = function(val) {

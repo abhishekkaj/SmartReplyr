@@ -48,6 +48,13 @@
         </td>
     </tr>
     <tr>
+        <th scope="row"><label for="quick_prompts">Quick Reply Prompts</label></th>
+        <td>
+            <input name="quick_prompts" type="text" id="quick_prompts" value="<?php echo esc_attr( $settings['quick_prompts'] ); ?>" class="large-text">
+            <p class="description">Comma-separated list of suggested questions shown after lead capture.</p>
+        </td>
+    </tr>
+    <tr>
         <th scope="row">Debug Mode</th>
         <td>
             <label><input type="checkbox" name="debug_mode" value="1" <?php checked( $settings['debug_mode'], '1' ); ?>> Enable NLP Debug Logging</label>

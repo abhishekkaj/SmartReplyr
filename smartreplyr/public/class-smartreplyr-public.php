@@ -19,6 +19,7 @@ class SmartReplyr_Public {
             'avatar'        => ! empty( $settings['avatar_url'] ) ? $settings['avatar_url'] : SMARTREPLYR_PLUGIN_URL . 'assets/img/default-avatar.svg',
             'welcome_message' => $settings['welcome_message'] ?? 'How can we help you today?',
             'courses'       => array_map( 'trim', explode( ',', $settings['courses_list'] ?? '' ) ),
+            'quick_prompts' => array_map( 'trim', explode( ',', $settings['quick_prompts'] ?? '' ) ),
             'gdpr_enabled'  => $settings['gdpr_enabled'] ?? '0',
             'gdpr_text'     => $settings['gdpr_text'] ?? '',
             'nonce'         => hash_hmac( 'sha256', 'smartreplyr_public_api', wp_salt( 'nonce' ) ),
