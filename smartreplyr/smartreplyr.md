@@ -1,83 +1,122 @@
 # SmartReplyr - WordPress Plugin
 > Turn Visitors Into Leads Automatically
 
-**SmartReplyr** is a production-ready WordPress plugin developed for education institutes, focused on providing an AI-powered lead generation chatbot.
+**SmartReplyr** is a production-ready WordPress plugin for education institutes. It provides an AI-powered lead generation chatbot that captures visitor details first, then answers queries using a built-in KB-powered offline AI engine.
 
-## Features Implemented
+## Features
 
-1. **Lead Capture First:** Mandatory lead form (Name, Email, Phone, Course Interest) before allowing users to interact with the AI chat.
-2. **AI Chat System:** Native integration with OpenAI (GPT-4o mini / GPT-4o / GPT-3.5 Turbo) including token management and system prompt generation based on page context.
-3. **Knowledge Base:** An admin-managed Q&A index that the AI queries dynamically, ensuring the chatbot provides factual answers tailored to the institute. Correctly serves as a fallback to generic prompts.
-4. **Flexible CRM Webhook Integration:** Send structured JSON payload to external webhooks (e.g. LeadSquared, Zapier, Make) with **dynamic fuzzy field-mapping**. Supports mapping any internal key (name, phone, lead_source, etc.) to any custom CRM key.
-5. **Email Notification:** Includes a custom HTML email template triggered on new lead capture. Can be configured to route via external custom SMTP settings.
-6. **Smart Context:** Automatically detects the current page URL, page title, and referral tags to personalize AI answers contextually.
-7. **GDPR Ready:** Fully manageable GDPR checkbox requirement built into the frontend widget before users can chat.
-8. **Admin Dashboard:** Full dashboard to view overall lead conversion rates, filtering, log viewing, widget customization (color/avatar/UI options), and detailed CSV exports of leads.
-9. **Hardened Guest Visibility:** Specialized loading sequence using high-priority hooks (`plugins_loaded`, `wp_body_open`) and fallback rendering to ensure the bot shows up on sites with security layers, caches, or password protection.
-10. **Lead Tracking:** Integrated UTM tracking (`utm_source`, `utm_medium`, etc.) and a custom **Lead Source** setting for granular attribution.
+1. **Lead Capture First** — Mandatory form (Name, Email, Phone, Course Interest) before chat access.
+2. **Offline AI Engine** — Self-contained NLP using BM25/TF-IDF scoring, synonym expansion, and morphological stemming. Works **without any API key**.
+3. **Knowledge Base (KB)** — Admin-managed Q&A store that acts as the AI's brain. More entries = smarter bot.
+4. **OpenAI Fallback** — Optional. If an API key is configured, OpenAI GPT is used when KB matching fails.
+5. **Flexible CRM Webhook** — Sends lead data to any CRM (LeadSquared, Zapier, Make) with fuzzy field mapping and custom lead source.
+6. **Email Notifications** — HTML email sent on lead capture via wp_mail or custom SMTP.
+7. **UTM & Lead Source Tracking** — Full UTM parameter capture + custom lead source field.
+8. **Tab-Aware Admin UI** — Settings organized by tabs; saving one tab never overwrites another.
+9. **Guest Visibility Hardened** — High-priority hooks ensure the widget loads on sites behind caches, security layers, or password protection.
+10. **GDPR Consent** — Configurable consent checkbox on the lead form.
+11. **Mobile Close Button** — X button in chatbot header for mobile users.
+12. **Quick Reply Chips** — Customizable suggested prompts shown after lead capture.
+13. **Custom Avatar & Branding** — WP Media Library integration for bot avatar; color picker for primary color.
+14. **Debug & Log System** — All AI responses, webhook deliveries, and email attempts are logged in a dedicated DB table viewable in the admin.
+15. **CSV Export** — All leads exportable to CSV from the admin dashboard.
+
+## How the AI Works (No API Key Required)
+
+See **[SMARTREPLYR_BOT.md](./SMARTREPLYR_BOT.md)** for a complete plain-English + technical breakdown of the AI engine.
+
+### Decision Flow
+
+```
+User Message
+    │
+    ▼
+NLP Engine (class-smartreplyr-nlp.php)
+    ├── Normalize + Synonym Expand
+    ├── Tokenize + Stem
+    ├── BM25 / TF-IDF score vs all KB entries
+    ├── Intent detect → boost matching entries
+    └── Score ≥ 30?
+         ├── YES → generate_response() → fluent, personalized reply
+         └── NO  → OpenAI configured?
+                      ├── YES → OpenAI API → reply
+                      └── NO  → smart_fallback() → graceful intelligent reply
+```
 
 ## API Structure
 
-The plugin operates primarily over the WP REST API under the namespace: `smartreplyr/v1`.
+Namespace: `smartreplyr/v1`
 
-### Public Endpoints
-*   `POST /wp-json/smartreplyr/v1/lead`
-    *   Creates a new lead from the widget.
-    *   Requires: `name`, `email`, `phone`, `consent` (if GDPR active).
-    *   Returns: `lead_id`, `conversation_id`, and `message`.
-    *   Triggers background Webhook delivery and Email routines.
-*   `POST /wp-json/smartreplyr/v1/chat`
-    *   Processes user queries and fetches AI reply.
-    *   Requires `lead_id`, `message`, `page_context`.
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| POST | `/lead` | Public (HMAC nonce) | Submit lead form |
+| POST | `/chat` | Public (HMAC nonce) | Send chat message |
+| GET | `/widget-config` | Public | Fetch widget config |
+| GET | `/leads` | Admin | List/filter leads |
+| GET/POST | `/knowledge` | Admin | KB CRUD |
+| DELETE | `/knowledge/{id}` | Admin | Delete KB entry |
 
-## Database Schema
+## Settings Map (by Tab)
 
-5 custom tables are built upon activation:
+### General & Bot UI
+`bot_name`, `openai_api_key`, `openai_model`, `system_prompt`, `welcome_message`, `fallback_message`, `quick_prompts`, `debug_mode`, `gdpr_enabled`, `gdpr_text`
 
-### 1. `wp_smartreplyr_leads`
-Store lead details, page context, and UTM parameters.
+### Avatar & Branding
+`avatar_url`, `primary_color`, `chat_position`, `courses_list`
 
-### 2. `wp_smartreplyr_conversations`
-Store full JSON-serialized chat history linked to leads.
+### CRM Webhook
+`webhook_enabled`, `webhook_url`, `lead_source`, `field_mapping`
 
-### 3. `wp_smartreplyr_settings`
-Global plugin configuration (OpenAI keys, colors, webhook URLs, etc.).
+### Email & SMTP
+`email_enabled`, `notification_email`, `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `smtp_encryption`
 
-### 4. `wp_smartreplyr_knowledge_base`
-Q&A pairs for the RAG (Retrieval Augmented Generation) engine.
+## Database Tables (5 Total)
 
-### 5. `wp_smartreplyr_logs`
-Detailed execution logs for Webhooks, AI responses, and SMTP failures.
+| Table | Purpose |
+|-------|---------|
+| `wp_smartreplyr_leads` | Lead data + UTM + consent + sending status |
+| `wp_smartreplyr_conversations` | Full JSON chat history per lead |
+| `wp_smartreplyr_settings` | All plugin configuration (key-value) |
+| `wp_smartreplyr_knowledge_base` | Q&A entries that power the offline AI |
+| `wp_smartreplyr_logs` | Webhook, email, AI, and security event logs |
 
 ## Changelog
 
-### v2.2.2 (Current)
-- **Fuzzy CRM Mapping:** Webhook engine now automatically detects intent if users use labels like "First Name" or "Mobile" in their mapping JSON instead of the technical internal keys.
-- **Custom Lead Source:** Added ability to define and map a custom lead source (e.g. "Dubai Campus Chatbot") per site instance.
-- **Tab-Aware Admin UI:** Refactored the settings save logic to prevent cross-tab settings overwrites; saving CRM settings no longer unchecks Email notifications.
-- **Production Persistence:** Integrated `localStorage` lead persistence to prevent data loss if a user refreshes the page mid-conversation.
+### v2.2.3 (Current)
+- **Offline AI Engine:** Complete NLP overhaul using BM25/TF-IDF scoring, synonym expansion, n-gram phrase matching, intent detection, and morphological stemming — works 100% without OpenAI API.
+- **Fluent Response Generator:** KB answers are now transformed into personalized, conversational replies with lead's name, course context, and CTAs.
+- **Smart Fallback Layer:** Handles greetings, thank-you messages, and contact requests intelligently without any KB entry.
+- **Customizable Quick Prompts:** Admin can now define suggested chips from the backend.
+
+### v2.2.2
+- Fuzzy CRM field mapping (handles "First Name", "Mobile", etc.)
+- Custom Lead Source field in CRM settings tab.
+- Tab-aware settings save — saving CRM tab no longer unchecks Email notifications.
+- Close button (×) added to chatbot header for mobile users.
+- SMTP email hardening and detailed failure logging.
+- Fixed email class file corruption and path constant (`SMARTREPLYR_AI_PLUGIN_DIR` → `SMARTREPLYR_PLUGIN_DIR`).
 
 ### v2.2.1
-- **Bulletproof Global Initialization:** Strategic move of plugin boot to `plugins_loaded` and priority `1` hooks to ensure visibility on sites hidden behind Bluehost/Mandatory password screens.
-- **Asset Fallbacks:** Removed hard dependency on `intl-tel-input` CDN. The chatbot now degrades gracefully to a standard input if the external CDN is blocked by firewalls.
-- **Static API Security:** Replaced session-based nonces with specialized static HMAC-SHA256 hashes to ensure API reliability for guests arriving via aggressive caching systems.
+- High-priority boot hooks (`plugins_loaded`, priority 1) for guest visibility on secured sites.
+- Removed hard CDN dependency for `intl-tel-input`.
+- HMAC-SHA256 static nonce for robust API security without session dependency.
 
 ### v2.2.0
-- **Conversational Lead Capture Pipeline:** Sequential chat-bot state machine capturing Name, Email, Phone, and Course natively.
-- **Premium Design Overhaul:** Deep box shadows, organic gradient launchers, pulsating trigger animations, and dynamic micro-interactions.
-- **Smart Message Delay:** Simulated human typing latencies and `fadeUp` delays for a more natural feel.
+- Conversational lead capture pipeline (state machine: Name → Email → Phone → Course).
+- Premium SaaS-level UI with animations and micro-interactions.
+- Auto-open widget (5s delay).
 
 ### v2.1.0
-- Refactored Admin UI Settings to a highly scalable, dynamic section-component loader.
-- Added deep native Chatbot Test simulator inside the configuration board.
-- Bulletproofed plugin lifecycle with global sandbox implementation.
+- Dynamic tab-based admin settings UI.
+- Built-in chatbot test simulator.
+- Global fatal error sandbox.
 
 ### v2.0.0
 - Complete rebranding from EduLead AI → SmartReplyr.
-- Updated database tables and UI naming conventions.
 
 ## Future Roadmap
 
-*   **Embedding Search:** Upgrade basic keyword knowledge-base lookup to true vector embeddings.
-*   **Website Scraper Integration:** Direct URL-scraping in Admin to auto-populate the Knowledge Base.
-*   **Handoff to Human:** Option to seamlessly page a human operator mid-conversation.
+- **Vector Embeddings:** Upgrade KB search to Weaviate/pgvector for semantic similarity.
+- **Website Scraper:** Auto-populate KB from institute website URLs.
+- **Human Handoff:** Live agent transfer mid-conversation.
+- **Multi-language Support:** Auto-translate responses for Hindi/regional language users.
