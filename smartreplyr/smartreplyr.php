@@ -121,4 +121,4 @@ function smartreplyr_run()
         $loader->run();
     });
 }
-smartreplyr_run();
+add_action('plugins_loaded', 'smartreplyr_run');

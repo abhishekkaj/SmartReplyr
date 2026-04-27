@@ -8,12 +8,10 @@ class SmartReplyr_Public {
         wp_enqueue_style( 'smartreplyr-widget-css', SMARTREPLYR_PLUGIN_URL . 'public/css/widget.css', array(), SMARTREPLYR_VERSION );
         
         wp_enqueue_script( 'intl-tel-input', 'https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/18.2.1/js/intlTelInput.min.js', array(), null, true );
-        // Removed hard dependency to ensure widget shows even if CDN is blocked
         wp_enqueue_script( 'smartreplyr-widget-js', SMARTREPLYR_PLUGIN_URL . 'public/js/widget.js', array(), SMARTREPLYR_VERSION, true );
         
         $settings = SmartReplyr_DB::get_all_settings();
-        
-        wp_localize_script( 'smartreplyr-widget-js', 'smartreplyrConfig', array(
+        $config = array(
             'api_url'       => rest_url( 'smartreplyr/v1' ),
             'bot_name'      => $settings['bot_name'] ?? 'SmartReplyr',
             'primary_color' => $settings['primary_color'] ?? '#6C5CE7',
@@ -28,7 +26,9 @@ class SmartReplyr_Public {
             'utm_medium'    => isset( $_GET['utm_medium'] ) ? sanitize_text_field( $_GET['utm_medium'] ) : '',
             'utm_campaign'  => isset( $_GET['utm_campaign'] ) ? sanitize_text_field( $_GET['utm_campaign'] ) : '',
             'page_title'    => get_the_title() ?: get_bloginfo('name'),
-        ) );
+        );
+
+        wp_add_inline_script( 'smartreplyr-widget-js', 'var smartreplyrConfig = ' . wp_json_encode( $config ) . ';', 'before' );
     }
 
     public function render_widget() {
