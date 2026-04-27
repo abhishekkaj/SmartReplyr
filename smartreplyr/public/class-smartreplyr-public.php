@@ -33,7 +33,7 @@ class SmartReplyr_Public {
 
     public function render_widget() {
         // Render root DOM element for the vanilla JS widget to mount into
-        echo '<div id="smartreplyr-widget-root"></div>';
+        echo '<!-- SmartReplyr Chatbot Root --><div id="smartreplyr-widget-root"></div>';
     }
 
     public function render_shortcode( $atts ) {

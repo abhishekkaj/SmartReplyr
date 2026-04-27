@@ -101,10 +101,13 @@ function smartreplyr_run()
     $loader->add_action('wp_ajax_smartreplyr_save_kb', $admin, 'ajax_save_kb');
     $loader->add_action('wp_ajax_smartreplyr_delete_kb', $admin, 'ajax_delete_kb');
 
-    // Public hooks
+    // Public hooks - Increased priority to ensure loading early
     $public = new SmartReplyr_Public();
-    $loader->add_action('wp_enqueue_scripts', $public, 'enqueue_assets');
-    $loader->add_action('wp_footer', $public, 'render_widget');
+    $loader->add_action('wp_enqueue_scripts', $public, 'enqueue_assets', 1);
+    $loader->add_action('wp_footer', $public, 'render_widget', 1);
+    
+    // Fallback for themes that support wp_body_open
+    $loader->add_action('wp_body_open', $public, 'render_widget', 1);
 
     // Shortcodes
     add_shortcode('smartreplyr_chat', array($public, 'render_shortcode'));
