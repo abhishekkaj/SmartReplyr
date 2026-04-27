@@ -140,6 +140,7 @@ class SmartReplyr_Activator {
             'openai_model'      => 'gpt-4o-mini',
             'webhook_url'       => '',
             'webhook_enabled'   => '0',
+            'lead_source'       => 'smartreplyr-chatbot',
             'field_mapping'     => '{}',
             'email_enabled'     => '0',
             'notification_email'=> '',

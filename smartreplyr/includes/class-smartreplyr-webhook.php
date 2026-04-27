@@ -17,6 +17,9 @@ class SmartReplyr_Webhook {
             $mapping_json = SmartReplyr_DB::get_setting( 'field_mapping', '{}' );
             $mapping      = json_decode( $mapping_json, true ) ?: array();
 
+            // Inject lead_source from settings into the lead data for mapping
+            $lead['lead_source'] = SmartReplyr_DB::get_setting( 'lead_source', 'smartreplyr-chatbot' );
+
             // Build payload with mapping
             $payload = $this->build_payload( $lead, $mapping );
 
@@ -63,6 +66,7 @@ class SmartReplyr_Webhook {
             'email'           => array('email', 'email address', 'email id'),
             'phone'           => array('phone', 'phone number', 'mobile', 'mobile number', 'contact'),
             'course_interest' => array('course', 'course interest', 'interest', 'program'),
+            'lead_source'     => array('lead source', 'source', 'origin', 'lead_source'),
         );
 
         // Normalize mapping keys to lowercase for comparison

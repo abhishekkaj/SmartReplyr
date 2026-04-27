@@ -12,6 +12,7 @@ $settings = wp_parse_args($settings, array(
     'fallback_message' => '',
     'webhook_enabled' => '0',
     'webhook_url' => '',
+    'lead_source' => 'smartreplyr-chatbot',
     'field_mapping' => '{}',
     'email_enabled' => '0',
     'notification_email' => '',

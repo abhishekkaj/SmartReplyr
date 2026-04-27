@@ -14,6 +14,13 @@
         </td>
     </tr>
     <tr>
+        <th scope="row"><label for="lead_source">Lead Source Name</label></th>
+        <td>
+            <input name="lead_source" type="text" id="lead_source" value="<?php echo esc_attr($settings['lead_source']); ?>" class="regular-text">
+            <p class="description">The source name passed to your CRM (e.g. Website Chatbot). Internal key: <code>lead_source</code></p>
+        </td>
+    </tr>
+    <tr>
         <th scope="row"><label for="field_mapping">Field Mapping (JSON)</label></th>
         <td>
             <textarea name="field_mapping" id="field_mapping" rows="6" class="large-text code"><?php 
