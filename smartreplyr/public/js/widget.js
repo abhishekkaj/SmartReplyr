@@ -8,6 +8,32 @@ document.addEventListener('DOMContentLoaded', function() {
     let leadId = localStorage.getItem('smartreplyr_lead_id');
     let isLeadSubmitted = localStorage.getItem('smartreplyr_lead_submitted') === 'true';
 
+    // ── Dynamic Form Field Renderer ────────────────────────────
+    function renderFormFields() {
+        const fields = smartreplyrConfig.form_fields || [];
+        return fields.filter(f => f.enabled !== false).map(f => {
+            const req = f.required ? 'required' : '';
+            const ph  = f.placeholder ? `placeholder="${escapeHtml(f.placeholder)}"` : '';
+            let input = '';
+
+            if (f.type === 'select') {
+                const opts = smartreplyrConfig.courses && smartreplyrConfig.courses.length
+                    ? smartreplyrConfig.courses.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')
+                    : '';
+                input = `<select name="${escapeHtml(f.key)}" style="color:#111!important;background:#fff!important;" ${req}>${opts}</select>`;
+            } else if (f.type === 'textarea') {
+                input = `<textarea name="${escapeHtml(f.key)}" rows="3" class="large-text" ${ph} ${req}></textarea>`;
+            } else if (f.type === 'checkbox') {
+                return `<div class="sr-gdpr-check"><input type="checkbox" id="sr_field_${escapeHtml(f.key)}" name="${escapeHtml(f.key)}" value="1" ${req}><label for="sr_field_${escapeHtml(f.key)}">${escapeHtml(f.label)}</label></div>`;
+            } else {
+                const idAttr = f.key === 'phone' ? 'id="sr-phone"' : '';
+                input = `<input type="${escapeHtml(f.type)}" name="${escapeHtml(f.key)}" ${idAttr} ${ph} ${req}>`;
+            }
+
+            return `<div class="sr-form-group"><label>${escapeHtml(f.label)}${f.required ? ' <span style="color:#e11d48">*</span>' : ''}</label>${input}</div>`;
+        }).join('');
+    }
+
     // Build Widget HTML Template
     const widgetHtml = `
         <div class="sr-widget-window">
@@ -26,29 +52,12 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             
             <div class="sr-widget-body">
-                <!-- VIEW 1: LEAD FORM (VISIBLE BY DEFAULT) -->
+                <!-- VIEW 1: LEAD FORM -->
                 <div class="sr-form-view ${isLeadSubmitted ? 'sr-hidden' : ''}" id="sr-lead-form-view">
                     <p class="sr-intro-text">${smartreplyrConfig.welcome_message || 'Please fill the form below to start chat'}</p>
                     <form id="sr-lead-form">
-                        <div class="sr-form-group">
-                            <label>Full Name</label>
-                            <input type="text" name="name" placeholder="John Doe" required>
-                        </div>
-                        <div class="sr-form-group">
-                            <label>Email Address</label>
-                            <input type="email" name="email" placeholder="john@example.com" required>
-                        </div>
-                        <div class="sr-form-group">
-                            <label>Phone Number</label>
-                            <input type="tel" name="phone" id="sr-phone" placeholder="Your mobile number" required>
-                        </div>
-                        <div class="sr-form-group">
-                            <label>Course Interest</label>
-                            <select name="course" style="color: #111 !important; background: #fff !important; z-index: 9999;">
-                                ${smartreplyrConfig.courses.map(c => `<option value="${c}">${c}</option>`).join('')}
-                            </select>
-                        </div>
-                        
+                        ${renderFormFields()}
+
                         ${smartreplyrConfig.gdpr_enabled === '1' ? `
                         <div class="sr-gdpr-check">
                             <input type="checkbox" id="sr_consent" checked required>
@@ -68,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
 
-                <!-- VIEW 2: SUCCESS STATE (TRANSITIONAL) -->
+                <!-- VIEW 2: SUCCESS STATE -->
                 <div class="sr-success-view sr-hidden" id="sr-success-view">
                     <div class="sr-success-state">
                         <div class="sr-success-icon">✓</div>
@@ -184,6 +193,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData(leadForm);
             const fullPhone = iti ? iti.getNumber() : formData.get('phone');
 
+            // Collect all configured fields dynamically
+            const fields = smartreplyrConfig.form_fields || [];
+            const extra_fields = {};
+            fields.forEach(f => {
+                if (f.key !== 'name' && f.key !== 'email' && f.key !== 'phone' && f.key !== 'course') {
+                    const val = formData.get(f.key);
+                    if (val !== null) extra_fields[f.key] = val;
+                }
+            });
+
             const payload = {
                 name: formData.get('name'),
                 email: formData.get('email'),
@@ -192,7 +211,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 consent: 1,
                 page_url: window.location.href,
                 page_title: smartreplyrConfig.page_title,
-                referrer: document.referrer
+                referrer: document.referrer,
+                extra_fields: extra_fields
             };
 
             try {

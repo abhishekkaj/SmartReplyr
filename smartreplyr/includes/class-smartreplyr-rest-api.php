@@ -115,6 +115,11 @@ class SmartReplyr_REST_API {
                 return new WP_Error( 'consent_required', 'Please provide consent to proceed.', array( 'status' => 400 ) );
             }
 
+            // Capture custom fields as JSON
+            if ( ! empty( $params['extra_fields'] ) && is_array( $params['extra_fields'] ) ) {
+                $params['meta_data'] = wp_json_encode( $params['extra_fields'] );
+            }
+
             $lead_id = SmartReplyr_DB::insert_lead( $params );
             if ( ! $lead_id ) {
                 SmartReplyr_DB::add_log('lead', 'database', 'failed', "DB insertion failed", $params);

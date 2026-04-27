@@ -23,6 +23,7 @@ $settings = wp_parse_args($settings, array(
     'smtp_password' => '',
     'courses_list' => '',
     'quick_prompts' => 'View Courses,Fee Structure,Apply Now',
+    'form_fields' => '',
     'gdpr_enabled' => '1',
     'gdpr_text' => '',
     'debug_mode' => '0'
@@ -61,6 +62,7 @@ if ( ! function_exists('smartreplyr_render_section') ) {
         <a href="?page=smartreplyr-settings&tab=avatar" class="nav-tab <?php echo $active_tab == 'avatar' ? 'nav-tab-active' : ''; ?>">Avatar & Branding</a>
         <a href="?page=smartreplyr-settings&tab=crm" class="nav-tab <?php echo $active_tab == 'crm' ? 'nav-tab-active' : ''; ?>">CRM Webhook</a>
         <a href="?page=smartreplyr-settings&tab=email" class="nav-tab <?php echo $active_tab == 'email' ? 'nav-tab-active' : ''; ?>">Email & SMTP</a>
+        <a href="?page=smartreplyr-settings&tab=form-builder" class="nav-tab <?php echo $active_tab == 'form-builder' ? 'nav-tab-active' : ''; ?>">Form Builder</a>
         <a href="?page=smartreplyr-settings&tab=test-bot" class="nav-tab <?php echo $active_tab == 'test-bot' ? 'nav-tab-active' : ''; ?>">Test Chatbot</a>
     </h2>
 
@@ -82,6 +84,8 @@ if ( ! function_exists('smartreplyr_render_section') ) {
                 smartreplyr_render_section('crm');
             } elseif ($active_tab === 'email') {
                 smartreplyr_render_section('email');
+            } elseif ($active_tab === 'form-builder') {
+                smartreplyr_render_section('form-builder');
             } elseif ($active_tab === 'test-bot') {
                 smartreplyr_render_section('test-bot');
             }

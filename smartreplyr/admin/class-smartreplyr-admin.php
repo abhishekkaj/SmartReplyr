@@ -106,10 +106,11 @@ class SmartReplyr_Admin {
 
         // Map fields to their respective tabs to prevent cross-tab overwrites
         $tab_fields_map = array(
-            'general' => array( 'bot_name', 'openai_api_key', 'openai_model', 'system_prompt', 'welcome_message', 'fallback_message', 'quick_prompts', 'debug_mode', 'gdpr_enabled', 'gdpr_text' ),
-            'avatar'  => array( 'avatar_url', 'primary_color', 'chat_position', 'courses_list' ),
-            'crm'     => array( 'webhook_enabled', 'webhook_url', 'lead_source', 'field_mapping' ),
-            'email'   => array( 'email_enabled', 'notification_email', 'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_encryption' ),
+            'general'      => array( 'bot_name', 'openai_api_key', 'openai_model', 'system_prompt', 'welcome_message', 'fallback_message', 'quick_prompts', 'debug_mode', 'gdpr_enabled', 'gdpr_text' ),
+            'avatar'       => array( 'avatar_url', 'primary_color', 'chat_position', 'courses_list' ),
+            'crm'          => array( 'webhook_enabled', 'webhook_url', 'lead_source', 'field_mapping' ),
+            'email'        => array( 'email_enabled', 'notification_email', 'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_encryption' ),
+            'form-builder' => array( 'form_fields' ),
         );
 
         $fields = isset( $tab_fields_map[ $active_tab ] ) ? $tab_fields_map[ $active_tab ] : $tab_fields_map['general'];
@@ -146,6 +147,9 @@ class SmartReplyr_Admin {
                 } elseif ( $field === 'system_prompt' || $field === 'welcome_message' || $field === 'fallback_message' || $field === 'gdpr_text' ) {
                     $val = sanitize_textarea_field( $val );
                 } else if ( $field === 'field_mapping' ) {
+                    $decoded = json_decode( $val, true );
+                    $val = wp_json_encode( is_array( $decoded ) ? $decoded : array() );
+                } else if ( $field === 'form_fields' ) {
                     $decoded = json_decode( $val, true );
                     $val = wp_json_encode( is_array( $decoded ) ? $decoded : array() );
                 } else if ( in_array( $field, array( 'gdpr_enabled', 'webhook_enabled', 'email_enabled', 'debug_mode' ) ) ) {

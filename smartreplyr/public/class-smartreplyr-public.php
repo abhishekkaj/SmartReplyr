@@ -27,6 +27,7 @@ class SmartReplyr_Public {
             'utm_medium'    => isset( $_GET['utm_medium'] ) ? sanitize_text_field( $_GET['utm_medium'] ) : '',
             'utm_campaign'  => isset( $_GET['utm_campaign'] ) ? sanitize_text_field( $_GET['utm_campaign'] ) : '',
             'page_title'    => get_the_title() ?: get_bloginfo('name'),
+            'form_fields'   => $this->get_form_fields( $settings ),
         );
 
         wp_add_inline_script( 'smartreplyr-widget-js', 'var smartreplyrConfig = ' . wp_json_encode( $config ) . ';', 'before' );
@@ -40,5 +41,21 @@ class SmartReplyr_Public {
     public function render_shortcode( $atts ) {
         // Output widget div dynamically for page builders
         return '<div id="smartreplyr-widget-root"></div>';
+    }
+
+    private function get_form_fields( $settings ) {
+        $default = array(
+            array('key'=>'name',   'label'=>'Full Name',       'type'=>'text',   'placeholder'=>'John Doe',           'required'=>true,  'enabled'=>true, 'core'=>true),
+            array('key'=>'email',  'label'=>'Email Address',   'type'=>'email',  'placeholder'=>'john@example.com',   'required'=>true,  'enabled'=>true, 'core'=>true),
+            array('key'=>'phone',  'label'=>'Phone Number',    'type'=>'tel',    'placeholder'=>'Your mobile number', 'required'=>true,  'enabled'=>true, 'core'=>true),
+            array('key'=>'course', 'label'=>'Course Interest', 'type'=>'select', 'placeholder'=>'',                   'required'=>false, 'enabled'=>true, 'core'=>true),
+        );
+        if ( ! empty( $settings['form_fields'] ) ) {
+            $decoded = json_decode( $settings['form_fields'], true );
+            if ( is_array( $decoded ) && count( $decoded ) > 0 ) {
+                return $decoded;
+            }
+        }
+        return $default;
     }
 }
