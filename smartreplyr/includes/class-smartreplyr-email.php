@@ -5,11 +5,12 @@ class SmartReplyr_Email {
 
     /**
      * Configure SMTP if set in plugin settings.
+     * Hooks into phpmailer_init to override default mail behavior.
      */
     public function maybe_configure_smtp() {
         $host = SmartReplyr_DB::get_setting( 'smtp_host', '' );
         if ( empty( $host ) ) {
-            return; // Use WP default mail
+            return;
         }
 
         add_action( 'phpmailer_init', function( $phpmailer ) {
@@ -20,6 +21,11 @@ class SmartReplyr_Email {
             $phpmailer->Username   = SmartReplyr_DB::get_setting( 'smtp_username' );
             $phpmailer->Password   = SmartReplyr_DB::get_setting( 'smtp_password' );
             $phpmailer->SMTPSecure = SmartReplyr_DB::get_setting( 'smtp_encryption', 'tls' );
+            
+            // Force From Name to match SMTP Username if it looks like an email
+            if ( is_email( $phpmailer->Username ) ) {
+                $phpmailer->From = $phpmailer->Username;
+            }
         } );
     }
 
@@ -28,12 +34,17 @@ class SmartReplyr_Email {
      */
     public function send_notification( $lead ) {
         return smartreplyr_safe_execute(function() use ($lead) {
+            $enabled = SmartReplyr_DB::get_setting( 'email_enabled', '0' );
+            if ( $enabled !== '1' ) {
+                return false;
+            }
+
             $to = SmartReplyr_DB::get_setting( 'notification_email', get_option( 'admin_email' ) );
             if ( empty( $to ) ) {
                 return false;
             }
 
-            // Configure SMTP if needed
+            // Ensure SMTP is configured
             $this->maybe_configure_smtp();
 
             $subject = sprintf(
@@ -43,16 +54,28 @@ class SmartReplyr_Email {
             );
 
             $body = $this->build_email_body( $lead );
+            $from_email = SmartReplyr_DB::get_setting( 'smtp_username', get_option( 'admin_email' ) );
+            if ( ! is_email( $from_email ) ) {
+                $from_email = get_option( 'admin_email' );
+            }
 
             $headers = array(
                 'Content-Type: text/html; charset=UTF-8',
-                'From: SmartReplyr <' . get_option( 'admin_email' ) . '>',
+                'From: SmartReplyr <' . $from_email . '>',
             );
 
+            // Capture errors during sending
+            ob_start();
             $sent = wp_mail( $to, $subject, $body, $headers );
+            $possible_error = ob_get_clean();
 
             if ( ! $sent ) {
-                error_log( 'SmartReplyr Email Error: Failed to send notification for lead #' . $lead['id'] );
+                SmartReplyr_DB::add_log('email', 'internal', 'failed', "Email sending failed. " . strip_tags($possible_error), array('lead_id' => $lead['id']));
+                error_log( 'SmartReplyr Email Error: ' . $possible_error );
+            } else {
+                // Update lead record
+                global $wpdb;
+                $wpdb->update( $wpdb->prefix . 'smartreplyr_leads', array( 'email_sent' => 1 ), array( 'id' => $lead['id'] ) );
             }
 
             return $sent;
@@ -63,7 +86,7 @@ class SmartReplyr_Email {
      * Build HTML email body.
      */
     private function build_email_body( $lead ) {
-        $template_path = SMARTREPLYR_AI_PLUGIN_DIR . 'templates/email-template.php';
+        $template_path = SMARTREPLYR_PLUGIN_DIR . 'templates/email-template.php';
 
         if ( file_exists( $template_path ) ) {
             ob_start();
