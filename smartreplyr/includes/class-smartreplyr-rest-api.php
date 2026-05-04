@@ -57,12 +57,12 @@ class SmartReplyr_REST_API {
     }
 
     public function public_permission_check( $request ) {
-        // Rate Limiting (IP-based, max 3 req / min)
+        // Rate Limiting (IP-based, max 30 req / min — chatbots need many rapid requests)
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
         $transient_key = 'sr_rate_limit_' . md5( $ip );
         $requests = get_transient( $transient_key ) ?: 0;
 
-        if ( $requests >= 3 ) {
+        if ( $requests >= 30 ) {
             SmartReplyr_DB::add_log('security', 'rate_limit', 'failed', "Rate limit exceeded for IP: $ip", array('ip' => $ip));
             return new WP_Error( 'rate_limit_exceeded', 'Too many requests. Please wait a minute and try again.', array( 'status' => 429 ) );
         }
@@ -177,7 +177,7 @@ class SmartReplyr_REST_API {
     /* ─── Chat Message ────────────────────────── */
 
     public function chat_message( $request ) {
-        $result = smartreplyr_safe_execute(function() use ($request) {
+        try {
             $params  = $request->get_json_params();
             $lead_id = intval( $params['lead_id'] ?? 0 );
             $message = sanitize_textarea_field( $params['message'] ?? '' );
@@ -191,74 +191,100 @@ class SmartReplyr_REST_API {
             // Verify lead exists
             $lead = SmartReplyr_DB::get_lead( $lead_id );
             if ( ! $lead ) {
-                SmartReplyr_DB::add_log('chat', 'existence', 'failed', "Lead #$lead_id not found in DB", array('lead_id' => $lead_id));
-                return new WP_Error( 'invalid_lead', 'Lead not found.', array( 'status' => 404 ) );
+                // Lead not found — might be stale localStorage. Still answer the question.
+                SmartReplyr_DB::add_log('chat', 'existence', 'warning', "Lead #$lead_id not found, proceeding with empty context", array('lead_id' => $lead_id));
+                $lead = array();
             }
 
-            // Get or create conversation
-            $conversation = SmartReplyr_DB::get_conversation_by_lead( $lead_id );
-            if ( ! $conversation ) {
-                $conv_id = SmartReplyr_DB::create_conversation( $lead_id, $page_context );
-                $conversation = SmartReplyr_DB::get_conversation( $conv_id );
+            // Get or create conversation (with fault tolerance)
+            $messages = array();
+            $conversation = null;
+            try {
+                $conversation = SmartReplyr_DB::get_conversation_by_lead( $lead_id );
+                if ( ! $conversation ) {
+                    $conv_id = SmartReplyr_DB::create_conversation( $lead_id, $page_context );
+                    $conversation = SmartReplyr_DB::get_conversation( $conv_id );
+                }
+                if ( $conversation ) {
+                    $messages = json_decode( $conversation['messages'], true ) ?: array();
+                }
+            } catch ( Throwable $e ) {
+                // Conversation DB issue — non-fatal, continue with empty history
+                error_log( '[SmartReplyr] Conversation DB error: ' . $e->getMessage() );
             }
 
-            $messages = json_decode( $conversation['messages'], true ) ?: array();
-
-            // Add user message
+            // Add user message to history
             $messages[] = array(
                 'role'      => 'user',
                 'content'   => $message,
                 'timestamp' => current_time( 'mysql' ),
             );
 
-            // Try rule-based NLP match first
-            $nlp_match = SmartReplyr_NLP::match_query( $message, $lead );
+            // === AI Response Pipeline ===
             $reply = null;
-            
             $debug_mode = SmartReplyr_DB::get_setting( 'debug_mode', '0' );
             $debug_info = array();
 
-            if ( $nlp_match && ! empty( $nlp_match['answer'] ) ) {
-                // Generate a fluent, personalized response from the matched KB entry
-                $reply = SmartReplyr_NLP::generate_response( $nlp_match, $lead, $messages );
-                SmartReplyr_DB::add_log('chat', 'nlp', 'success', "NLP match found for lead #$lead_id (score: " . ( $nlp_match['_match_score'] ?? 'n/a' ) . ")", array('query' => $message));
-                if ( $debug_mode === '1' ) {
-                    $debug_info = array(
-                        'source'    => 'nlp_engine',
-                        'intent'    => $nlp_match['_intent'] ?? 'none',
-                        'score'     => $nlp_match['_match_score'] ?? 0,
-                        'matched_q' => $nlp_match['question'] ?? '',
-                    );
+            // STAGE 1: Try offline NLP engine against Knowledge Base
+            try {
+                $nlp_match = SmartReplyr_NLP::match_query( $message, $lead );
+                if ( $nlp_match && ! empty( $nlp_match['answer'] ) ) {
+                    $reply = SmartReplyr_NLP::generate_response( $nlp_match, $lead, $messages );
+                    SmartReplyr_DB::add_log('chat', 'nlp', 'success', "NLP match for lead #$lead_id (score: " . ( $nlp_match['_match_score'] ?? 'n/a' ) . ")", array('query' => $message));
+                    if ( $debug_mode === '1' ) {
+                        $debug_info = array(
+                            'source'    => 'nlp_engine',
+                            'intent'    => $nlp_match['_intent'] ?? 'none',
+                            'score'     => $nlp_match['_match_score'] ?? 0,
+                            'matched_q' => $nlp_match['question'] ?? '',
+                        );
+                    }
                 }
-            } else {
-                // Try OpenAI if API key is configured
-                $api_key = SmartReplyr_DB::get_setting( 'openai_api_key', '' );
-                if ( ! empty( $api_key ) ) {
-                    $ai = new SmartReplyr_AI();
-                    $reply = $ai->get_response( $message, $messages, $page_context, $lead );
-                    SmartReplyr_DB::add_log('chat', 'ai_processor', 'success', "OpenAI response for lead #$lead_id", array('query' => $message));
-                    if ( $debug_mode === '1' ) {
-                        $debug_info = array( 'source' => 'openai' );
+            } catch ( Throwable $e ) {
+                error_log( '[SmartReplyr] NLP engine error: ' . $e->getMessage() );
+            }
+
+            // STAGE 2: Try OpenAI if NLP didn't match and API key exists
+            if ( $reply === null ) {
+                try {
+                    $api_key = SmartReplyr_DB::get_setting( 'openai_api_key', '' );
+                    if ( ! empty( $api_key ) ) {
+                        $ai = new SmartReplyr_AI();
+                        $reply = $ai->get_response( $message, $messages, $page_context, $lead );
+                        SmartReplyr_DB::add_log('chat', 'ai_processor', 'success', "OpenAI response for lead #$lead_id", array('query' => $message));
+                        if ( $debug_mode === '1' ) {
+                            $debug_info = array( 'source' => 'openai' );
+                        }
                     }
-                } else {
-                    // No API key & no NLP match → use smart offline fallback
-                    $reply = SmartReplyr_NLP::smart_fallback( $message, $lead, $messages );
-                    SmartReplyr_DB::add_log('chat', 'nlp_fallback', 'success', "Smart fallback used for lead #$lead_id", array('query' => $message));
-                    if ( $debug_mode === '1' ) {
-                        $debug_info = array( 'source' => 'smart_fallback' );
-                    }
+                } catch ( Throwable $e ) {
+                    error_log( '[SmartReplyr] OpenAI error: ' . $e->getMessage() );
                 }
             }
 
-            // Add assistant message
+            // STAGE 3: Smart offline fallback (ALWAYS succeeds — never fails)
+            if ( $reply === null || $reply === '' ) {
+                $reply = SmartReplyr_NLP::smart_fallback( $message, $lead, $messages );
+                SmartReplyr_DB::add_log('chat', 'nlp_fallback', 'success', "Smart fallback for lead #$lead_id", array('query' => $message));
+                if ( $debug_mode === '1' ) {
+                    $debug_info = array( 'source' => 'smart_fallback' );
+                }
+            }
+
+            // Add assistant message to history
             $messages[] = array(
                 'role'      => 'assistant',
                 'content'   => $reply,
                 'timestamp' => current_time( 'mysql' ),
             );
 
-            // Save conversation
-            SmartReplyr_DB::update_conversation_messages( $conversation['id'], $messages );
+            // Save conversation (non-fatal if this fails)
+            try {
+                if ( $conversation ) {
+                    SmartReplyr_DB::update_conversation_messages( $conversation['id'], $messages );
+                }
+            } catch ( Throwable $e ) {
+                error_log( '[SmartReplyr] Conversation save error: ' . $e->getMessage() );
+            }
 
             $response_data = array(
                 'success' => true,
@@ -270,16 +296,16 @@ class SmartReplyr_REST_API {
             }
 
             return rest_ensure_response( $response_data );
-        });
 
-        if ($result === null) {
+        } catch ( Throwable $e ) {
+            // Absolute last resort — STILL return success with a human-friendly fallback
+            error_log( '[SmartReplyr Critical] Chat pipeline crash: ' . $e->getMessage() );
+            $fallback = SmartReplyr_NLP::smart_fallback( $message ?? '', array(), array() );
             return rest_ensure_response(array(
-                'success' => false,
-                'reply'   => SmartReplyr_DB::get_setting( 'fallback_message', 'I am currently experiencing technical issues. Please try again later.' )
+                'success' => true,
+                'reply'   => $fallback,
             ));
         }
-
-        return $result;
     }
 
     /* ─── Widget Config ───────────────────────── */

@@ -254,10 +254,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const msg = msgInput.value.trim();
             if (!msg || isTyping) return;
 
+            isTyping = true;
             appendUserMessage(messagesContainer, msg);
             msgInput.value = '';
             
-            await askAI(messagesContainer, msg);
+            try {
+                await askAI(messagesContainer, msg);
+            } finally {
+                isTyping = false;
+            }
         });
 
         // Focus fix
@@ -275,7 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function askAI(container, msg) {
+    async function askAI(container, msg, retryCount = 0) {
         const tId = showTypingIndicator(container);
         try {
             const res = await fetch(`${smartreplyrConfig.api_url}/chat`, {
@@ -283,17 +288,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: { 'Content-Type': 'application/json', 'X-SR-Nonce': smartreplyrConfig.nonce },
                 body: JSON.stringify({ lead_id: leadId, message: msg, page_context: window.location.href })
             });
+
+            // Handle rate limiting
+            if (res.status === 429) {
+                document.getElementById(tId)?.remove();
+                appendBotMessage(container, "I'm processing a lot of messages right now! ⏳ Please wait a moment and try again.");
+                return;
+            }
+
+            // Handle server errors with retry
+            if (res.status >= 500 && retryCount < 1) {
+                document.getElementById(tId)?.remove();
+                await new Promise(r => setTimeout(r, 1000));
+                return askAI(container, msg, retryCount + 1);
+            }
+
             const data = await res.json();
             document.getElementById(tId)?.remove();
             
-            if (data.success) {
+            if (data.success && data.reply) {
+                appendBotMessage(container, data.reply);
+            } else if (data.reply) {
+                // Has a reply but success is false — still show it
                 appendBotMessage(container, data.reply);
             } else {
-                appendBotMessage(container, "I'm having trouble connecting. Please try again.");
+                appendBotMessage(container, "I appreciate your patience! 🙏 Could you try rephrasing your question? I can help with courses, fees, admissions, placements, and more!");
             }
         } catch (err) {
             document.getElementById(tId)?.remove();
-            appendBotMessage(container, "Network error. Please check your connection.");
+            if (retryCount < 1) {
+                await new Promise(r => setTimeout(r, 1500));
+                return askAI(container, msg, retryCount + 1);
+            }
+            appendBotMessage(container, "It seems there's a connection issue. 🔄 Please check your internet and try again. If the problem persists, try refreshing the page.");
         }
     }
 
