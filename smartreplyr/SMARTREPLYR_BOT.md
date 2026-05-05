@@ -236,6 +236,38 @@ Category: financial
 
 ---
 
+## 📥 Excel/CSV Knowledge Base Import
+
+For bulk management, you can import your Knowledge Base from an Excel (.xlsx) or CSV file.
+
+### How to Import
+1. Go to **SmartReplyr > Knowledge Base**.
+2. Click **Download Template** to get a sample file with the correct headers.
+3. Add your Q&As to the file (Question and Answer are required).
+4. Click **Import Excel/CSV**, select your file, and choose your mode:
+   - **Append**: Adds new entries to your existing KB.
+   - **Replace**: Deletes your current KB and replaces it with the new file.
+5. Click **Start Import**. A summary will show you how many rows were imported or skipped.
+
+### Required Format (Columns)
+| Column | Description |
+|--------|-------------|
+| **Question** | Required. The visitor's potential question. |
+| **Answer** | Required. The factual response the AI will provide. |
+| **Keywords** | Optional. Comma-separated terms to boost matching. |
+| **Intent** | Optional. A label like `fees` or `admission`. |
+| **Category** | Optional. A grouping like `financial` or `academic`. |
+| **Source** | Optional. Reference for where the info came from. |
+
+### Strict Validation Rules
+To maintain the **Strict KB-Only** standard, the importer enforces these rules:
+- **No Empty Fields**: Rows missing a Question or Answer are automatically skipped.
+- **Min Length**: Questions must be at least 3 characters; Answers must be at least 10 characters.
+- **Clean Data**: The system automatically strips invalid hidden characters and trims whitespace.
+- **Normalization**: Keywords are automatically cleaned and lowercased for better matching.
+
+---
+
 ## 🏗 Technical Architecture (For Developers)
 
 ### File Structure

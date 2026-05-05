@@ -25,6 +25,7 @@
 18. **CSV Export** — All leads exportable to CSV from the admin dashboard.
 19. **Fault-Tolerant Pipeline** — Guaranteed response on every query; granular try/catch at each stage prevents silent failures.
 20. **Smart Widget UX** — Auto-retry on network errors, proper typing state management, contextual error messages.
+21. **Excel/CSV KB Import** — Bulk upload Q&A entries using .xlsx or .csv files with strict validation and replace/append modes. Includes a downloadable template.
 
 ## How the AI Works (No API Key Required)
 
@@ -104,6 +105,7 @@ Namespace: `smartreplyr/v1`
 
 ## Changelog
 
+- **Excel/CSV KB Import:** Added a native, dependency-free import system for .xlsx and .csv files. Supports Append/Replace modes and provides a downloadable template.
 - **Strict KB-Only Mode:** Raised thresholds (18/22 → 65%), removed score padding, and added hard filter (min 20 chars) to ensure zero hallucinations.
 - **Verbatim Responses:** Removed random greetings, CTAs, and course injections from AI replies. What you put in the KB is exactly what the user sees.
 - **Safe Fallbacks:** Gutted topic-specific fallback generation. The bot now only handles social intents and safe redirects to human teams.
