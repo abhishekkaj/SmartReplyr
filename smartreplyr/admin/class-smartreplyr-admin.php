@@ -601,7 +601,14 @@ class SmartReplyr_Admin {
      */
     public function ajax_download_kb_template() {
         check_ajax_referer( 'smartreplyr_admin_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Permission denied' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( 'Permission denied' );
+        }
+
+        // Clean any output buffers to prevent corrupted CSV or header errors
+        if ( ob_get_length() ) {
+            ob_clean();
+        }
 
         $filename = 'smartreplyr-kb-template.csv';
         header( 'Content-Type: text/csv; charset=utf-8' );
@@ -642,7 +649,7 @@ class SmartReplyr_Admin {
         ) );
 
         fclose( $output );
-        wp_die();
+        exit;
     }
 
     /* ─── Views ───────────────────────────────── */
