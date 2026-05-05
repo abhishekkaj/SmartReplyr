@@ -155,19 +155,24 @@ class SmartReplyr_NLP {
         $compare_text = substr( $entry_text, 0, 500 );
         similar_text( $norm_query, $compare_text, $sim_score );
 
-        // 3. Keyword match score (25%)
+        // 3. Keyword match score (30%)
         $kw_score = 0;
         if ( ! empty( $entry['keywords'] ) ) {
             $kws = json_decode( $entry['keywords'], true );
             if ( is_array( $kws ) && ! empty( $kws ) ) {
-                $kw_matched = 0;
+                $max_kw_match = 0;
                 foreach ( $kws as $kw ) {
                     $kw_norm = self::normalize_advanced( $kw );
-                    if ( ! empty( $kw_norm ) && strpos( $norm_query, $kw_norm ) !== false ) {
-                        $kw_matched++;
+                    if ( empty( $kw_norm ) ) continue;
+                    if ( $norm_query === $kw_norm ) {
+                        $max_kw_match = 100;
+                        break;
+                    }
+                    if ( strpos( $norm_query, $kw_norm ) !== false || strpos( $kw_norm, $norm_query ) !== false ) {
+                        $max_kw_match = max( $max_kw_match, 80 );
                     }
                 }
-                $kw_score = min( 100, ( $kw_matched / count( $kws ) ) * 100 );
+                $kw_score = $max_kw_match;
             }
         }
 
@@ -181,9 +186,12 @@ class SmartReplyr_NLP {
             $title_bonus = 80;
         }
 
-        $final = ( $overlap_score * 0.40 ) + ( $sim_score * 0.25 ) + ( $kw_score * 0.25 ) + ( $title_bonus * 0.10 );
-
-        // No short query boost — strict mode requires genuine confidence
+        // Dynamic weighting for short queries
+        if ( count( $user_tokens ) <= 2 ) {
+            $final = ( $overlap_score * 0.45 ) + ( $kw_score * 0.40 ) + ( $title_bonus * 0.15 );
+        } else {
+            $final = ( $overlap_score * 0.40 ) + ( $sim_score * 0.20 ) + ( $kw_score * 0.30 ) + ( $title_bonus * 0.10 );
+        }
 
         return $final;
     }
@@ -219,28 +227,19 @@ class SmartReplyr_NLP {
         $entry_question = self::normalize_advanced( $entry['question'] );
         $entry_tokens   = self::tokenize( $entry_question );
 
-        // --- 1. TF-IDF / BM25 Score (40%) ---
-        $bm25_score = 0;
-        $k1 = 1.5; $b = 0.75;
-        $avg_len = 8; // average KB question length in tokens
-        $doc_len = max( 1, count( $entry_tokens ) );
-
-        foreach ( $user_tokens as $token ) {
-            $tf = 0;
+        // --- 1. Token Overlap Score (40%) ---
+        $matched_tokens = 0;
+        foreach ( $user_tokens as $ut ) {
             foreach ( $entry_tokens as $et ) {
-                if ( $et === $token || self::soft_match( $token, $et ) ) $tf++;
+                if ( self::soft_match( $ut, $et ) ) { $matched_tokens++; break; }
             }
-            if ( $tf === 0 ) continue;
-            $tf_norm = ( $tf * ( $k1 + 1 ) ) / ( $tf + $k1 * ( 1 - $b + $b * $doc_len / $avg_len ) );
-            $idf_val = $idf[ $token ] ?? 1;
-            $bm25_score += $tf_norm * $idf_val;
         }
-        $bm25_score = min( 100, $bm25_score * 12 ); // normalize to 0-100 range
+        $overlap_score = min( 100, ( $matched_tokens / max( 1, count( $user_tokens ) ) ) * 100 );
 
-        // --- 2. String Similarity Score (25%) ---
+        // --- 2. String Similarity Score (20%) ---
         similar_text( $norm_query, $entry_question, $sim_score );
 
-        // --- 3. Keyword Overlap Score (25%) ---
+        // --- 3. Keyword Overlap Score (30%) ---
         $kw_score = self::keyword_score( $norm_query, $user_tokens, $entry, $entry_tokens );
 
         // --- 4. Exact phrase bonus (10%) ---
@@ -257,7 +256,13 @@ class SmartReplyr_NLP {
             }
         }
 
-        $final = ( $bm25_score * 0.40 ) + ( $sim_score * 0.25 ) + ( $kw_score * 0.25 ) + ( $exact_bonus * 0.10 );
+        // Dynamic weighting for short queries
+        if ( count( $user_tokens ) <= 2 ) {
+            // Drop sim_score penalty for short queries
+            $final = ( $overlap_score * 0.45 ) + ( $kw_score * 0.40 ) + ( $exact_bonus * 0.15 );
+        } else {
+            $final = ( $overlap_score * 0.40 ) + ( $sim_score * 0.20 ) + ( $kw_score * 0.30 ) + ( $exact_bonus * 0.10 );
+        }
 
         // Intent match bonus
         if ( $detected_intent && ! empty( $entry['intent'] ) && strtolower( trim( $entry['intent'] ) ) === $detected_intent ) {
@@ -267,8 +272,6 @@ class SmartReplyr_NLP {
         if ( $detected_intent && ! empty( $entry['intent'] ) && strtolower( trim( $entry['intent'] ) ) !== $detected_intent ) {
             $final *= 0.60;
         }
-
-        // No short query boost — strict mode requires genuine confidence, not inflated scores
 
         return $final;
     }
@@ -460,14 +463,31 @@ class SmartReplyr_NLP {
         if ( ! empty( $entry['keywords'] ) ) {
             $kws = json_decode( $entry['keywords'], true );
             if ( is_array( $kws ) && ! empty( $kws ) ) {
-                $matched = 0;
+                $max_match = 0;
                 foreach ( $kws as $kw ) {
                     $kw_norm = self::normalize_advanced( $kw );
-                    if ( ! empty( $kw_norm ) && strpos( $norm_query, $kw_norm ) !== false ) {
-                        $matched++;
+                    if ( empty( $kw_norm ) ) continue;
+                    
+                    if ( $norm_query === $kw_norm ) {
+                        return 100;
+                    }
+                    if ( strpos( $norm_query, $kw_norm ) !== false || strpos( $kw_norm, $norm_query ) !== false ) {
+                        $max_match = max( $max_match, 80 );
+                    }
+                    
+                    $kw_tokens = self::tokenize( $kw_norm );
+                    $overlap = 0;
+                    foreach ( $user_tokens as $ut ) {
+                        foreach ( $kw_tokens as $kt ) {
+                            if ( self::soft_match( $ut, $kt ) ) { $overlap++; break; }
+                        }
+                    }
+                    if ( ! empty( $kw_tokens ) ) {
+                        $score = ( $overlap / count( $kw_tokens ) ) * 100;
+                        $max_match = max( $max_match, $score );
                     }
                 }
-                return min( 100, ( $matched / count( $kws ) ) * 100 );
+                return $max_match;
             }
         }
 
@@ -479,7 +499,7 @@ class SmartReplyr_NLP {
                 if ( self::soft_match( $ut, $et ) ) { $matched++; break; }
             }
         }
-        return min( 100, ( $matched / max( 1, count( $entry_tokens ) ) ) * 100 );
+        return min( 100, ( $matched / max( 1, count( $user_tokens ) ) ) * 100 );
     }
 
     /**
