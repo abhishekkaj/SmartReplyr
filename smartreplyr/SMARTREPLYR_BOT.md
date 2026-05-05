@@ -10,7 +10,7 @@ SmartReplyr is a chatbot that lives on your website. When a visitor arrives, it 
 1. **Captures the visitor's details** (Name, Email, Phone, Course Interest) before letting them chat.
 2. **Answers their questions** using your own custom Knowledge Base AND your website's actual content — like a smart FAQ that actually understands what they're asking.
 
-**The key difference from other chatbots:** SmartReplyr does NOT need any external AI subscription like ChatGPT to work. It has its own built-in AI engine that reads your Knowledge Base + scans your website pages and gives accurate, personalized answers — for free, forever.
+**The key difference from other chatbots:** SmartReplyr is a **strict, high-trust system**. It does NOT guess or "generate" information. It only answers if it finds a high-confidence match (65%+) in your Knowledge Base or website content. No hallucinations, no AI subscriptions, 100% control.
 
 ---
 
@@ -58,42 +58,29 @@ For each Q&A in your Knowledge Base, the bot calculates a **relevance score** (0
 - **Fallback token overlap** — any words in common
 
 ### Step 3: The Bot Picks the Best Match
-If the best score is **18 or above**, that answer is used. Short queries (1-2 words like "fees" or "location") get a +20 boost to help them cross the threshold. If no manual KB match is found, the bot moves on to **website content matching**.
+If the best score is **65 or above**, that answer is used. This is a strict threshold to ensure the bot never gives a "wrong" answer. If no manual KB match is found, the bot moves on to **website content matching**.
 
 ### Step 3.5: Website Content Matching (NEW)
 If the manual KB doesn't have a match, the bot searches **auto-crawled website content** — your actual pages and posts:
 - The bot knows which page the visitor is currently on, and **boosts answers from that page by 1.5×**
-- If a match is found, it returns the answer with a **"📄 Learn more"** link to the source page
-- This means the bot can answer questions about ANY content on your site, even if you didn't manually add it to the KB
+- If a match is found with a score of **65 or above**, it returns the answer with a source link.
+- This means the bot can answer questions about ANY content on your site, but only if it's 100% sure.
 
-### Step 4: The Bot Crafts a Personalized Reply
-The bot doesn't just copy-paste the KB answer. It:
-- Adds the student's **first name** ("Great question, Priya!")
-- References their **course interest** ("This applies to your MBA program as well.")
-- Occasionally adds a **call-to-action** ("Would you like to schedule a campus visit? 📅")
+### Step 4: The Bot Delivers a Verbatim Reply
+The bot returns the content exactly as stored in your Knowledge Base or on your website. It only replaces basic placeholders (like `{{lead_name}}`). It does not add random greetings or calls-to-action, ensuring 100% accuracy and trust.
 
-### Step 5: Smart Fallback (if Nothing Matches)
-If the answer isn't in the KB or website content, the bot detects the **topic** of the question and gives a rich, helpful response:
+### Step 5: Smart Fallback (Social & Safe Redirects)
+If the answer isn't in the KB or website content, the bot **never guesses**. Instead, it handles social intents or provides a safe fallback:
 
-| Topic Detected | Response |
-|----------------|----------|
-| Greeting (hi, hello, namaste) | Warm personalized welcome with capability menu |
-| Thank-you (thanks, awesome, cool) | Varied friendly acknowledgements |
-| Goodbye (bye, later, done) | Warm farewell with invitation to return |
-| Contact request (speak, call, counselor) | Directs to admissions office with hours |
-| **Fees** (cost, payment, scholarship, EMI) | Fee structure overview + scholarship info |
-| **Admission** (apply, eligibility, cutoff) | Step-by-step admission process |
-| **Courses** (program, degree, specialization) | Program overview + course interest context |
-| **Placement** (job, salary, company, package) | Placement cell info + career opportunities |
-| **Campus** (location, infrastructure, library) | Campus facilities overview + visit invite |
-| **Hostel** (accommodation, mess, room) | Hostel amenities + security info |
-| **Ranking** (NAAC, NIRF, accreditation) | Credentials overview |
-| **Exam** (JEE, NEET, entrance) | Entrance exam guidance by program |
-| **Safety** (ragging, security, women) | Zero-tolerance policy + safety measures |
-| **Online** (distance, remote, e-learning) | Flexible learning options |
-| No match | Suggests related KB topics or helpful capability menu |
+| Intent Detected | Bot's Response |
+|-----------------|----------------|
+| Greeting (hi, hello) | Warm welcome to the institute. |
+| Thanks (thank you) | Polite acknowledgement. |
+| Goodbye (bye, tata) | Friendly farewell. |
+| Contact (call, human) | Redirects to the **Contact Us** page or Admissions office. |
+| **Anything Else** | "I don't have that exact info... Please contact our team." |
 
-> 💡 **The bot answers intelligently on 10+ topics even with ZERO KB entries — and gets even smarter with the Website Scanner.**
+> 💡 **SmartReplyr prioritizes accuracy over everything else.** It's better to say "I don't know" than to give a wrong answer.
 
 ---
 
@@ -298,14 +285,14 @@ smartreplyr/
 2. Calls `normalize_advanced()` + `tokenize()` on the user query
 3. Computes IDF (Inverse Document Frequency) for user tokens across the KB
 4. Iterates KB entries, calls `score_entry()` for each
-5. Short query boost: 1-2 word queries get +20 if tokens directly match
-6. Returns the best match if score ≥ 18, else null
+5. Hard filter: Rejects matches if the answer is too short (< 20 chars)
+6. Returns the best match if score ≥ 65, else null
 
 #### `match_site_content($user_query, $page_context, $lead_context)` — Website Content Matching
 1. Loads all chunks from `site_content` table
 2. Scores each chunk using token overlap (40%), string similarity (25%), keyword match (25%), title/heading bonus (10%)
 3. Applies page-context boost: 1.5× if user is currently on the same page
-4. Returns best match if score ≥ 22, with source URL for "Learn more" link
+4. Returns best match if score ≥ 65, with source URL link
 
 #### `score_entry()` — Hybrid Scorer
 | Component | Weight | Method |
@@ -325,19 +312,17 @@ smartreplyr/
 5. Return clean string
 
 #### `generate_response($match, $lead, $history)`
-- Takes the matched KB `answer` field
-- Replaces `{{institute_name}}` and `{{lead_name}}` placeholders
-- Prepends a personalized greeting (first 2 messages only)
-- Appends a course-specific suffix if student has expressed interest
-- Randomly adds a CTA (schedule visit, apply, talk to advisor)
+- Takes the matched KB `answer` field verbatim.
+- Replaces `{{institute_name}}` and `{{lead_name}}` placeholders.
+- Adds source attribution label if available.
+- **Strict Mode:** No greetings, CTA injections, or course mentions.
 
 #### `smart_fallback($user_query, $lead, $history)`
 | Trigger | Response |
 |---------|----------|
-| Greeting keywords (hi, hello, namaste) | Warm personalized welcome with bot intro |
-| Thank-you keywords (thanks, great, awesome) | Friendly acknowledgement |
-| Contact keywords (call, email, phone, speak) | Directs to Contact page |
-| Anything else | Helpful "here's what I can answer" message |
+| Social (hi, thanks, bye) | Polite, social response. |
+| Human (call, counselor) | Redirects to human team/contact page. |
+| Substantive questions | Safe fallback: "I don't have that exact info..." |
 
 ### REST API Security
 - **Nonce:** HMAC-SHA256 derived from WordPress salt — stateless, cache-safe, no session required

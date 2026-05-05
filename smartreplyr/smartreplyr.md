@@ -1,7 +1,7 @@
 # SmartReplyr - WordPress Plugin
 > Turn Visitors Into Leads Automatically
 
-**SmartReplyr** is a production-ready WordPress plugin for education institutes. It provides an AI-powered lead generation chatbot that captures visitor details first, then answers queries using a built-in KB-powered offline AI engine — enhanced by automatic website content scanning.
+**SmartReplyr** is a production-ready WordPress plugin for education institutes. It provides a **strict, high-trust lead generation chatbot** that captures visitor details first, then answers queries using a built-in KB-powered offline AI engine — ensuring zero hallucinations by only answering when confident matches exist in your content.
 
 ## Features
 
@@ -10,8 +10,8 @@
 3. **Knowledge Base (KB)** — Admin-managed Q&A store that acts as the AI's brain. More entries = smarter bot.
 4. **Website Content Scanner** — Auto-crawls all WordPress pages & posts, chunks content by headings, extracts keywords, and makes it searchable by the chatbot. One-click sync from admin.
 5. **Page-Context Awareness** — Chatbot answers are boosted 1.5× for content from the page the user is currently viewing.
-6. **OpenAI Fallback** — Optional. If an API key is configured, OpenAI GPT is used when KB matching fails.
-7. **Flexible CRM Webhook** — Sends lead data to any CRM (LeadSquared, Zapier, Make) with fuzzy field mapping and custom lead source.
+6. **Strict Answering Mode** — Never guesses or generates unknown info. Requires 65% match confidence.
+7. **No AI Dependency** — Operates 100% locally. OpenAI fallback is available but disabled by default to maintain high trust.
 8. **Email Notifications** — HTML email sent on lead capture via wp_mail or custom SMTP.
 9. **UTM & Lead Source Tracking** — Full UTM parameter capture + custom lead source field.
 10. **Tab-Aware Admin UI** — Settings organized by tabs; saving one tab never overwrites another.
@@ -30,7 +30,7 @@
 
 See **[SMARTREPLYR_BOT.md](./SMARTREPLYR_BOT.md)** for a complete plain-English + technical breakdown of the AI engine.
 
-### Decision Flow (4-Stage Pipeline)
+### Decision Flow (Strict 3-Stage Pipeline)
 
 ```
 User Message
@@ -41,27 +41,24 @@ STAGE 1: Manual KB Match (class-smartreplyr-nlp.php)
     ├── Tokenize + Stem
     ├── BM25 / TF-IDF score vs all KB entries
     ├── Intent detect → boost matching entries
-    ├── Short query boost (1-2 word queries get +20 score)
-    └── Score ≥ 18?
-         ├── YES → generate_response() → fluent, personalized reply
+    └── Score ≥ 65%?
+         ├── YES → generate_response() → verbatim KB answer + source
          └── NO ↓
 
 STAGE 1.5: Website Content Match (auto-crawled pages/posts)
     ├── Score site_content chunks using token overlap + keywords + similarity
     ├── Page-context boost: 1.5× if user is on same page
-    └── Score ≥ 22?
-         ├── YES → generate_site_content_response() + "Learn more" link
+    └── Score ≥ 65%?
+         ├── YES → generate_site_content_response() + source link
          └── NO ↓
 
-STAGE 2: OpenAI Fallback (if API key configured)
-    └── OpenAI API → reply
+STAGE 2: OpenAI Fallback (DISABLED)
+    └── Bypassed in strict mode to prevent hallucinations
 
-STAGE 3: Smart Offline Fallback (always succeeds)
+STAGE 3: Smart Offline Fallback (Social & Safe Fallback)
     ├── Greeting / Thanks / Goodbye detection
     ├── Contact / human request detection
-    ├── 10-topic intelligent fallback (fees, admission, courses, etc.)
-    ├── KB topic suggestion (partial match)
-    └── Generic helpful fallback
+    └── Safe controlled fallback ("I don't have that exact info...")
 ```
 
 ## API Structure
@@ -107,14 +104,12 @@ Namespace: `smartreplyr/v1`
 
 ## Changelog
 
-### v2.3.0 (Current)
-- **Website Content Scanner:** Auto-crawls all WordPress pages & posts, extracts headings and paragraphs, chunks into searchable segments, auto-generates keywords — one-click from admin.
-- **4-Stage Chat Pipeline:** Manual KB → Website Content → OpenAI → Smart Fallback. Each stage is fault-tolerant with independent try/catch.
+- **Strict KB-Only Mode:** Raised thresholds (18/22 → 65%), removed score padding, and added hard filter (min 20 chars) to ensure zero hallucinations.
+- **Verbatim Responses:** Removed random greetings, CTAs, and course injections from AI replies. What you put in the KB is exactly what the user sees.
+- **Safe Fallbacks:** Gutted topic-specific fallback generation. The bot now only handles social intents and safe redirects to human teams.
+- **OpenAI Disabled:** Bypassed Stage 2 to ensure 100% data control and trust.
+- **Website Content Scanner:** Auto-crawls all WordPress pages & posts, extracts headings and paragraphs, chunks into searchable segments.
 - **Page-Context Awareness:** Content from the page the user is currently viewing gets a 1.5× score boost.
-- **Source Attribution:** Answers from website content include a "📄 Learn more: [Page Title](url)" link.
-- **NLP Engine Hardened:** Threshold lowered 30→18, short query boost (+20 for 1-2 word queries), 13-category synonym map with 150+ variants.
-- **10-Topic Smart Fallback:** Detects fees, admission, courses, placement, campus, hostel, ranking, exams, safety, online learning — gives rich topic-specific responses even without KB entries.
-- **Widget UX Fixes:** Auto-retry on failures, rate-limit detection, proper isTyping state management.
 - **REST API Hardened:** Rate limit increased 3→30 req/min, guaranteed response on every query.
 
 ### v2.2.3
