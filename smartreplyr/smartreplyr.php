@@ -103,6 +103,8 @@ function smartreplyr_run()
     $loader->add_action('wp_ajax_smartreplyr_delete_kb', $admin, 'ajax_delete_kb');
     $loader->add_action('wp_ajax_smartreplyr_sync_content', $admin, 'ajax_sync_content');
     $loader->add_action('wp_ajax_smartreplyr_clear_content', $admin, 'ajax_clear_content');
+    $loader->add_action('wp_ajax_smartreplyr_import_kb', $admin, 'ajax_import_kb');
+    $loader->add_action('wp_ajax_smartreplyr_download_kb_template', $admin, 'ajax_download_kb_template');
 
     // Public hooks
     $public = new SmartReplyr_Public();

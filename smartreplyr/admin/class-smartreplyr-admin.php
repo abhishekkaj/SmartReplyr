@@ -314,6 +314,337 @@ class SmartReplyr_Admin {
         wp_send_json_success( array( 'message' => 'All crawled content has been cleared.' ) );
     }
 
+    /* ─── KB Import / Export AJAX ─────────────── */
+
+    /**
+     * Handle Excel/CSV Knowledge Base import.
+     * Accepts .csv and .xlsx files.
+     */
+    public function ajax_import_kb() {
+        check_ajax_referer( 'smartreplyr_admin_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Permission denied' );
+
+        if ( empty( $_FILES['kb_file'] ) || $_FILES['kb_file']['error'] !== UPLOAD_ERR_OK ) {
+            wp_send_json_error( 'No file uploaded or upload error.' );
+        }
+
+        $file = $_FILES['kb_file'];
+        $ext  = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );
+
+        if ( ! in_array( $ext, array( 'csv', 'xlsx' ), true ) ) {
+            wp_send_json_error( 'Invalid file type. Only .csv and .xlsx are accepted.' );
+        }
+
+        // Max 5MB
+        if ( $file['size'] > 5 * 1024 * 1024 ) {
+            wp_send_json_error( 'File too large. Maximum size is 5MB.' );
+        }
+
+        $import_mode = isset( $_POST['import_mode'] ) ? sanitize_text_field( $_POST['import_mode'] ) : 'append';
+
+        // Parse file into rows
+        $rows = array();
+        if ( $ext === 'csv' ) {
+            $rows = $this->parse_csv( $file['tmp_name'] );
+        } else {
+            $rows = $this->parse_xlsx( $file['tmp_name'] );
+        }
+
+        if ( is_wp_error( $rows ) ) {
+            wp_send_json_error( $rows->get_error_message() );
+        }
+
+        if ( empty( $rows ) ) {
+            wp_send_json_error( 'No valid data rows found in the file.' );
+        }
+
+        // Clear existing KB if replace mode
+        if ( $import_mode === 'replace' ) {
+            SmartReplyr_DB::clear_all_kb();
+        }
+
+        $imported = 0;
+        $skipped  = 0;
+        $errors   = array();
+
+        foreach ( $rows as $i => $row ) {
+            $row_num = $i + 2; // +2 because: 0-indexed + header row
+
+            $question = isset( $row['question'] ) ? trim( $row['question'] ) : '';
+            $answer   = isset( $row['answer'] )   ? trim( $row['answer'] )   : '';
+
+            // Validation: Question and Answer are required
+            if ( empty( $question ) || empty( $answer ) ) {
+                $skipped++;
+                $errors[] = "Row {$row_num}: Missing Question or Answer — skipped.";
+                continue;
+            }
+
+            // Clean invalid characters
+            $question = preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $question );
+            $answer   = preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $answer );
+
+            // Reject if too short after cleaning
+            if ( strlen( $question ) < 3 || strlen( $answer ) < 10 ) {
+                $skipped++;
+                $errors[] = "Row {$row_num}: Question too short (min 3 chars) or Answer too short (min 10 chars) — skipped.";
+                continue;
+            }
+
+            // Process keywords: normalize, lowercase, trim
+            $keywords_raw = isset( $row['keywords'] ) ? trim( $row['keywords'] ) : '';
+            $keywords = '';
+            if ( ! empty( $keywords_raw ) ) {
+                $kw_arr = array_filter( array_map( function( $k ) {
+                    return strtolower( trim( preg_replace( '/[^a-zA-Z0-9\s\-]/u', '', $k ) ) );
+                }, explode( ',', $keywords_raw ) ) );
+                $keywords = implode( ', ', $kw_arr );
+            }
+
+            $intent   = isset( $row['intent'] )   ? strtolower( trim( $row['intent'] ) )   : 'general';
+            $category = isset( $row['category'] ) ? strtolower( trim( $row['category'] ) ) : 'general';
+            $source   = isset( $row['source'] )   ? trim( $row['source'] )                 : 'excel_import';
+
+            // Sanitize intent/category to alphanumeric + underscore
+            $intent   = preg_replace( '/[^a-z0-9_]/u', '', $intent )   ?: 'general';
+            $category = preg_replace( '/[^a-z0-9_]/u', '', $category ) ?: 'general';
+
+            $data = array(
+                'question' => $question,
+                'answer'   => $answer,
+                'keywords' => $keywords,
+                'intent'   => $intent,
+                'category' => $category,
+                'source'   => $source,
+            );
+
+            $result = SmartReplyr_DB::insert_kb( $data );
+            if ( $result ) {
+                $imported++;
+            } else {
+                $skipped++;
+                $errors[] = "Row {$row_num}: Database insert failed — skipped.";
+            }
+        }
+
+        $total_kb = SmartReplyr_DB::count_kb();
+
+        wp_send_json_success( array(
+            'message'   => "Import complete! {$imported} entries added, {$skipped} skipped.",
+            'imported'  => $imported,
+            'skipped'   => $skipped,
+            'total_rows'=> count( $rows ),
+            'total_kb'  => $total_kb,
+            'errors'    => array_slice( $errors, 0, 10 ), // Max 10 error messages
+        ) );
+    }
+
+    /**
+     * Parse CSV file into associative array of rows.
+     */
+    private function parse_csv( $filepath ) {
+        $handle = fopen( $filepath, 'r' );
+        if ( ! $handle ) return new WP_Error( 'file_error', 'Could not read the CSV file.' );
+
+        // Try to detect BOM and skip it
+        $bom = fread( $handle, 3 );
+        if ( $bom !== "\xEF\xBB\xBF" ) {
+            rewind( $handle );
+        }
+
+        $header = fgetcsv( $handle );
+        if ( ! $header ) {
+            fclose( $handle );
+            return new WP_Error( 'format_error', 'CSV file has no header row.' );
+        }
+
+        // Normalize headers: lowercase, trim
+        $header = array_map( function( $h ) {
+            return strtolower( trim( preg_replace( '/[^a-z0-9_]/u', '', strtolower( trim( $h ) ) ) ) );
+        }, $header );
+
+        // Validate required columns
+        if ( ! in_array( 'question', $header ) || ! in_array( 'answer', $header ) ) {
+            fclose( $handle );
+            return new WP_Error( 'format_error', 'CSV must have "Question" and "Answer" columns.' );
+        }
+
+        $rows = array();
+        while ( ( $line = fgetcsv( $handle ) ) !== false ) {
+            if ( count( $line ) < count( $header ) ) {
+                $line = array_pad( $line, count( $header ), '' );
+            }
+            $row = array_combine( $header, array_slice( $line, 0, count( $header ) ) );
+            if ( $row !== false ) {
+                $rows[] = $row;
+            }
+        }
+
+        fclose( $handle );
+        return $rows;
+    }
+
+    /**
+     * Parse XLSX file into associative array using ZipArchive + XML.
+     * Lightweight — no external library required.
+     */
+    private function parse_xlsx( $filepath ) {
+        if ( ! class_exists( 'ZipArchive' ) ) {
+            return new WP_Error( 'dependency_error', 'PHP ZipArchive extension is required for .xlsx import. Please use .csv format instead.' );
+        }
+
+        $zip = new ZipArchive();
+        if ( $zip->open( $filepath ) !== true ) {
+            return new WP_Error( 'file_error', 'Could not open the XLSX file.' );
+        }
+
+        // Read shared strings
+        $strings = array();
+        $ss_xml = $zip->getFromName( 'xl/sharedStrings.xml' );
+        if ( $ss_xml ) {
+            $ss = simplexml_load_string( $ss_xml );
+            if ( $ss ) {
+                foreach ( $ss->si as $si ) {
+                    // Handle both simple <t> and rich text <r><t>
+                    $text = '';
+                    if ( isset( $si->t ) ) {
+                        $text = (string) $si->t;
+                    } elseif ( isset( $si->r ) ) {
+                        foreach ( $si->r as $r ) {
+                            $text .= (string) $r->t;
+                        }
+                    }
+                    $strings[] = $text;
+                }
+            }
+        }
+
+        // Read worksheet (sheet1)
+        $sheet_xml = $zip->getFromName( 'xl/worksheets/sheet1.xml' );
+        if ( ! $sheet_xml ) {
+            $zip->close();
+            return new WP_Error( 'format_error', 'Could not read worksheet data from XLSX.' );
+        }
+
+        $sheet = simplexml_load_string( $sheet_xml );
+        $zip->close();
+
+        if ( ! $sheet || ! isset( $sheet->sheetData->row ) ) {
+            return new WP_Error( 'format_error', 'XLSX file appears empty or malformed.' );
+        }
+
+        $all_rows = array();
+        foreach ( $sheet->sheetData->row as $row ) {
+            $row_data = array();
+            foreach ( $row->c as $cell ) {
+                $col_letter = preg_replace( '/[0-9]/', '', (string) $cell['r'] );
+                $col_index  = $this->xlsx_col_to_index( $col_letter );
+                $value = '';
+                if ( isset( $cell['t'] ) && (string) $cell['t'] === 's' ) {
+                    // Shared string reference
+                    $idx = intval( (string) $cell->v );
+                    $value = isset( $strings[ $idx ] ) ? $strings[ $idx ] : '';
+                } elseif ( isset( $cell->v ) ) {
+                    $value = (string) $cell->v;
+                } elseif ( isset( $cell->is ) ) {
+                    $value = (string) $cell->is->t;
+                }
+                $row_data[ $col_index ] = $value;
+            }
+            $all_rows[] = $row_data;
+        }
+
+        if ( count( $all_rows ) < 2 ) {
+            return new WP_Error( 'format_error', 'XLSX must have a header row and at least one data row.' );
+        }
+
+        // First row = header
+        $header_raw = $all_rows[0];
+        $max_col = max( array_keys( $header_raw ) );
+        $header = array();
+        for ( $c = 0; $c <= $max_col; $c++ ) {
+            $h = isset( $header_raw[ $c ] ) ? $header_raw[ $c ] : '';
+            $header[ $c ] = strtolower( trim( preg_replace( '/[^a-z0-9_]/u', '', strtolower( trim( $h ) ) ) ) );
+        }
+
+        if ( ! in_array( 'question', $header ) || ! in_array( 'answer', $header ) ) {
+            return new WP_Error( 'format_error', 'XLSX must have "Question" and "Answer" columns in the header row.' );
+        }
+
+        $rows = array();
+        for ( $r = 1; $r < count( $all_rows ); $r++ ) {
+            $row = array();
+            foreach ( $header as $col_idx => $col_name ) {
+                if ( empty( $col_name ) ) continue;
+                $row[ $col_name ] = isset( $all_rows[ $r ][ $col_idx ] ) ? $all_rows[ $r ][ $col_idx ] : '';
+            }
+            $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Convert Excel column letter (A, B, ..., Z, AA, AB) to 0-based index.
+     */
+    private function xlsx_col_to_index( $col ) {
+        $col = strtoupper( $col );
+        $index = 0;
+        for ( $i = 0; $i < strlen( $col ); $i++ ) {
+            $index = $index * 26 + ( ord( $col[ $i ] ) - ord( 'A' ) + 1 );
+        }
+        return $index - 1;
+    }
+
+    /**
+     * Generate and serve a sample CSV template for KB import.
+     */
+    public function ajax_download_kb_template() {
+        check_ajax_referer( 'smartreplyr_admin_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Permission denied' );
+
+        $filename = 'smartreplyr-kb-template.csv';
+        header( 'Content-Type: text/csv; charset=utf-8' );
+        header( 'Content-Disposition: attachment; filename=' . $filename );
+
+        $output = fopen( 'php://output', 'w' );
+
+        // BOM for Excel UTF-8 compatibility
+        fprintf( $output, chr(0xEF) . chr(0xBB) . chr(0xBF) );
+
+        // Header row
+        fputcsv( $output, array( 'Question', 'Answer', 'Keywords', 'Intent', 'Category', 'Source' ) );
+
+        // Sample rows
+        fputcsv( $output, array(
+            'What is the fee structure for MBA?',
+            'Our MBA program fee is Rs 1,20,000 per year. We offer merit-based scholarships covering up to 50% of the fee. EMI options are also available.',
+            'fees, cost, mba fees, scholarship, emi',
+            'fees',
+            'financial',
+            'manual',
+        ) );
+        fputcsv( $output, array(
+            'What are the admission requirements?',
+            'Admission requires a minimum of 50% in graduation with a valid entrance exam score. Apply online through our admissions portal.',
+            'admission, apply, eligibility, requirements',
+            'admission',
+            'academic',
+            'manual',
+        ) );
+        fputcsv( $output, array(
+            'What courses do you offer?',
+            'We offer BBA, MBA, BCA, MCA, B.Tech, M.Tech, and various diploma programs across multiple specializations.',
+            'courses, programs, degree, specialization',
+            'courses',
+            'academic',
+            'manual',
+        ) );
+
+        fclose( $output );
+        wp_die();
+    }
+
     /* ─── Views ───────────────────────────────── */
 
     public function view_dashboard() { include SMARTREPLYR_PLUGIN_DIR . 'admin/views/admin-dashboard.php'; }

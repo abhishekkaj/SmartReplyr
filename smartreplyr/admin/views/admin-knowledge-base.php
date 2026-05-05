@@ -1,10 +1,46 @@
 <div class="wrap smartreplyr-wrap">
     <h1 class="wp-heading-inline">Knowledge Base</h1>
     <a href="#" class="page-title-action btn-add-kb">Add New Q&A</a>
+    <a href="#" class="page-title-action btn-import-kb">Import Excel/CSV</a>
+    <a href="#" id="smartreplyr-download-kb-template" class="page-title-action">Download Template</a>
     <hr class="wp-header-end">
     
     <div class="notice notice-info">
-        <p>This knowledge base trains the AI. When a student asks a question, the AI will search these entries first before falling back to generic answers.</p>
+        <p>This knowledge base trains the AI. When a student asks a question, the AI will search these entries first before falling back to generic answers. The AI requires a strict 65% confidence match to answer.</p>
+    </div>
+
+    <!-- Import KB UI (Hidden by default) -->
+    <div id="sr-import-kb-wrapper" style="display:none; background:#fff; padding:20px; border:1px solid #ccd0d4; box-shadow:0 1px 1px rgba(0,0,0,.04); margin-bottom:20px;">
+        <h3>Import Knowledge Base</h3>
+        <p>Upload an Excel (.xlsx) or CSV file to bulk add entries to the Knowledge Base.</p>
+        <form id="sr-import-kb-form" enctype="multipart/form-data">
+            <table class="form-table">
+                <tr>
+                    <th scope="row"><label for="kb_file">Select File</label></th>
+                    <td>
+                        <input type="file" name="kb_file" id="kb_file" accept=".csv, .xlsx" required>
+                        <p class="description">Max file size: 5MB.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Import Mode</th>
+                    <td>
+                        <label><input type="radio" name="import_mode" value="append" checked> <strong>Append</strong> — Add new entries to the existing KB.</label><br>
+                        <label><input type="radio" name="import_mode" value="replace"> <strong style="color:#d63638;">Replace</strong> — Delete all existing entries and replace with the uploaded file.</label>
+                    </td>
+                </tr>
+            </table>
+            <p class="submit">
+                <button type="submit" class="button button-primary" id="btn-submit-import">Start Import</button>
+                <button type="button" class="button" id="btn-cancel-import">Cancel</button>
+            </p>
+        </form>
+
+        <div id="sr-import-results" style="display:none; margin-top:20px; padding:15px; border-left:4px solid #2271b1; background:#f6f7f7;">
+            <h4>Import Summary</h4>
+            <p id="sr-import-msg"><strong>Processing...</strong></p>
+            <ul id="sr-import-errors" style="color:#d63638; list-style-type:disc; padding-left:20px;"></ul>
+        </div>
     </div>
     
     <div class="sr-kb-layout">

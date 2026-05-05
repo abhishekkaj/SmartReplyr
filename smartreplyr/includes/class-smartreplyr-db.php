@@ -277,6 +277,18 @@ class SmartReplyr_DB {
         return $wpdb->delete( $table, array( 'id' => intval( $id ) ) );
     }
 
+    public static function clear_all_kb() {
+        global $wpdb;
+        $table = self::get_kb_table();
+        return $wpdb->query( "TRUNCATE TABLE $table" );
+    }
+
+    public static function count_kb() {
+        global $wpdb;
+        $table = self::get_kb_table();
+        return (int) $wpdb->get_var( "SELECT COUNT(*) FROM $table" );
+    }
+
     public static function get_all_kb() {
         global $wpdb;
         $table = self::get_kb_table();

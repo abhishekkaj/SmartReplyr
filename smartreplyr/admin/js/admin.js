@@ -189,6 +189,92 @@
             });
         });
 
+        // --- KB Import / Export ---
+        
+        // Download Template
+        $('#smartreplyr-download-kb-template').on('click', function(e) {
+            e.preventDefault();
+            window.location.href = smartreplyrAdmin.ajax_url + '?action=smartreplyr_download_kb_template&nonce=' + smartreplyrAdmin.nonce;
+        });
+
+        // Show Import Form
+        $('.btn-import-kb').on('click', function(e) {
+            e.preventDefault();
+            $('#sr-import-kb-wrapper').slideDown();
+        });
+
+        // Hide Import Form
+        $('#btn-cancel-import').on('click', function() {
+            $('#sr-import-kb-wrapper').slideUp();
+            $('#sr-import-kb-form')[0].reset();
+            $('#sr-import-results').hide();
+        });
+
+        // Handle Import Submit
+        $('#sr-import-kb-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const btn = $('#btn-submit-import');
+            const originalText = btn.text();
+            
+            if ( ! $('#kb_file').val() ) {
+                alert('Please select a file to import.');
+                return;
+            }
+            
+            const mode = $('input[name="import_mode"]:checked').val();
+            if ( mode === 'replace' ) {
+                if ( ! confirm('WARNING: You are about to DELETE all existing Knowledge Base entries and replace them with this file. This action cannot be undone. Are you sure?') ) {
+                    return;
+                }
+            }
+
+            btn.text('Uploading...').prop('disabled', true);
+            $('#sr-import-results').show();
+            $('#sr-import-msg').html('<strong>Uploading and processing file... Please wait.</strong>');
+            $('#sr-import-errors').empty();
+
+            const formData = new FormData(this);
+            formData.append('action', 'smartreplyr_import_kb');
+            formData.append('nonce', smartreplyrAdmin.nonce);
+
+            $.ajax({
+                url: smartreplyrAdmin.ajax_url,
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    btn.text(originalText).prop('disabled', false);
+                    
+                    if (response.success) {
+                        const data = response.data;
+                        $('#sr-import-msg').html(
+                            `<strong style="color: green;">Success!</strong> ${data.imported} entries imported. ${data.skipped} skipped.<br>
+                             Total KB Size: ${data.total_kb} entries.<br>
+                             <em>Page will reload in 3 seconds...</em>`
+                        );
+                        
+                        if (data.errors && data.errors.length > 0) {
+                            data.errors.forEach(err => {
+                                $('#sr-import-errors').append(`<li>${err}</li>`);
+                            });
+                        }
+                        
+                        setTimeout(function() {
+                            location.reload();
+                        }, 3000);
+                    } else {
+                        $('#sr-import-msg').html(`<strong style="color: red;">Error:</strong> ${response.data}`);
+                    }
+                },
+                error: function() {
+                    btn.text(originalText).prop('disabled', false);
+                    $('#sr-import-msg').html('<strong style="color: red;">A server error occurred during upload.</strong>');
+                }
+            });
+        });
+
         // --- Format Markdown to simple HTML for chat preview ---
         function formatText(text) {
             if (!text) return '';
