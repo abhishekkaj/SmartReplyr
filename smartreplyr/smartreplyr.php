@@ -44,11 +44,11 @@ if (!function_exists('smartreplyr_safe_execute')) {
 /* ──────────────────────────────────────────────
  * Constants
  * ──────────────────────────────────────────── */
-define('SMARTREPLYR_VERSION', '2.2.0');
+define('SMARTREPLYR_VERSION', '2.3.0');
 define('SMARTREPLYR_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SMARTREPLYR_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('SMARTREPLYR_PLUGIN_BASENAME', plugin_basename(__FILE__));
-define('SMARTREPLYR_DB_VERSION', '2.2.0');
+define('SMARTREPLYR_DB_VERSION', '2.3.0');
 
 /* ──────────────────────────────────────────────
  * Activation / Deactivation / Uninstall
@@ -67,6 +67,7 @@ try {
     require_once SMARTREPLYR_PLUGIN_DIR . 'includes/class-smartreplyr-rest-api.php';
     require_once SMARTREPLYR_PLUGIN_DIR . 'includes/class-smartreplyr-nlp.php';
     require_once SMARTREPLYR_PLUGIN_DIR . 'includes/class-smartreplyr-ai.php';
+    require_once SMARTREPLYR_PLUGIN_DIR . 'includes/class-smartreplyr-crawler.php';
     require_once SMARTREPLYR_PLUGIN_DIR . 'includes/class-smartreplyr-webhook.php';
     require_once SMARTREPLYR_PLUGIN_DIR . 'includes/class-smartreplyr-email.php';
     require_once SMARTREPLYR_PLUGIN_DIR . 'admin/class-smartreplyr-admin.php';
@@ -100,6 +101,8 @@ function smartreplyr_run()
     $loader->add_action('wp_ajax_smartreplyr_export_csv', $admin, 'export_csv');
     $loader->add_action('wp_ajax_smartreplyr_save_kb', $admin, 'ajax_save_kb');
     $loader->add_action('wp_ajax_smartreplyr_delete_kb', $admin, 'ajax_delete_kb');
+    $loader->add_action('wp_ajax_smartreplyr_sync_content', $admin, 'ajax_sync_content');
+    $loader->add_action('wp_ajax_smartreplyr_clear_content', $admin, 'ajax_clear_content');
 
     // Public hooks
     $public = new SmartReplyr_Public();

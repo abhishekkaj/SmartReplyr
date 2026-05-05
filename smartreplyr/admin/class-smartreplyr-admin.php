@@ -52,6 +52,15 @@ class SmartReplyr_Admin {
 
         add_submenu_page(
             'smartreplyr-dashboard',
+            'Website Scanner',
+            'Website Scanner',
+            'manage_options',
+            'smartreplyr-scanner',
+            array( $this, 'view_scanner' )
+        );
+
+        add_submenu_page(
+            'smartreplyr-dashboard',
             'Settings',
             'Settings',
             'manage_options',
@@ -269,11 +278,48 @@ class SmartReplyr_Admin {
         ) );
     }
 
+    /* ─── Website Scanner AJAX ────────────────── */
+
+    public function ajax_sync_content() {
+        check_ajax_referer( 'smartreplyr_admin_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Permission denied' );
+
+        // Increase limits for crawling
+        @set_time_limit( 120 );
+        @ini_set( 'memory_limit', '256M' );
+
+        $force = isset( $_POST['force_full'] ) && $_POST['force_full'] === '1';
+
+        try {
+            $stats = SmartReplyr_Crawler::crawl_all( $force );
+            $db_stats = SmartReplyr_DB::get_site_content_stats();
+            wp_send_json_success( array(
+                'message'         => "Sync completed! {$stats['pages_processed']} pages scanned, {$stats['chunks_created']} content chunks created.",
+                'stats'           => $stats,
+                'total_chunks'    => $db_stats['total_chunks'],
+                'total_pages'     => $db_stats['total_pages'],
+                'last_sync'       => $db_stats['last_sync'],
+            ) );
+        } catch ( Throwable $e ) {
+            error_log( '[SmartReplyr Crawler] Fatal: ' . $e->getMessage() );
+            wp_send_json_error( 'Sync failed: ' . $e->getMessage() );
+        }
+    }
+
+    public function ajax_clear_content() {
+        check_ajax_referer( 'smartreplyr_admin_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Permission denied' );
+
+        SmartReplyr_DB::clear_site_content();
+        wp_send_json_success( array( 'message' => 'All crawled content has been cleared.' ) );
+    }
+
     /* ─── Views ───────────────────────────────── */
 
     public function view_dashboard() { include SMARTREPLYR_PLUGIN_DIR . 'admin/views/admin-dashboard.php'; }
     public function view_leads() { include SMARTREPLYR_PLUGIN_DIR . 'admin/views/admin-leads.php'; }
     public function view_conversations() { include SMARTREPLYR_PLUGIN_DIR . 'admin/views/admin-conversations.php'; }
     public function view_knowledge_base() { include SMARTREPLYR_PLUGIN_DIR . 'admin/views/admin-knowledge-base.php'; }
+    public function view_scanner() { include SMARTREPLYR_PLUGIN_DIR . 'admin/views/admin-website-scanner.php'; }
     public function view_settings() { include SMARTREPLYR_PLUGIN_DIR . 'admin/views/settings-page.php'; }
 }

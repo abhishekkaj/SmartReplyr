@@ -114,9 +114,27 @@ class SmartReplyr_Activator {
             KEY idx_created (created_at)
         ) $charset;";
 
+        // ── Site Content (auto-crawled KB) ──────────
+        $sql_site_content = "CREATE TABLE {$prefix}smartreplyr_site_content (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            post_id BIGINT(20) UNSIGNED NOT NULL,
+            post_type VARCHAR(50) DEFAULT 'page',
+            title VARCHAR(500) NOT NULL,
+            heading VARCHAR(500) DEFAULT '',
+            chunk_text TEXT NOT NULL,
+            keywords LONGTEXT,
+            source_url TEXT,
+            content_hash VARCHAR(64) NOT NULL,
+            synced_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY idx_post_id (post_id),
+            KEY idx_post_type (post_type),
+            KEY idx_hash (content_hash)
+        ) $charset;";
+
         $wpdb->hide_errors();
         
-        $queries = array( $sql_leads, $sql_conversations, $sql_settings, $sql_kb, $sql_logs );
+        $queries = array( $sql_leads, $sql_conversations, $sql_settings, $sql_kb, $sql_logs, $sql_site_content );
         foreach ( $queries as $query ) {
             dbDelta( $query );
             if ( ! empty( $wpdb->last_error ) ) {

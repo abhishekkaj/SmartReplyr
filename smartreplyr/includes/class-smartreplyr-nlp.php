@@ -56,6 +56,173 @@ class SmartReplyr_NLP {
     }
 
     /**
+     * Match user query against auto-crawled website content (site_content table).
+     * Uses same BM25-style scoring as KB matching, with page-context boosting.
+     *
+     * @param string $user_query      The user's message
+     * @param string $page_context    URL of the page the user is currently on
+     * @param array  $lead_context    Lead data for personalization
+     * @return array|null  Best match with answer, source_url, title, or null
+     */
+    public static function match_site_content( $user_query, $page_context = '', $lead_context = array() ) {
+        $site_entries = SmartReplyr_DB::get_all_site_content();
+        if ( empty( $site_entries ) ) return null;
+
+        $normalized_query = self::normalize_advanced( $user_query );
+        $user_tokens = self::tokenize( $normalized_query );
+
+        if ( empty( $user_tokens ) ) return null;
+
+        $best_match    = null;
+        $highest_score = 0;
+
+        // Normalize page context path for comparison
+        $context_path = '';
+        if ( ! empty( $page_context ) ) {
+            $context_path = rtrim( wp_parse_url( $page_context, PHP_URL_PATH ) ?: '', '/' );
+        }
+
+        foreach ( $site_entries as $entry ) {
+            $score = self::score_site_chunk( $entry, $normalized_query, $user_tokens );
+
+            // Page-context boost: if user is ON this page, boost score 1.5x
+            if ( ! empty( $context_path ) && ! empty( $entry['source_url'] ) ) {
+                $entry_path = rtrim( wp_parse_url( $entry['source_url'], PHP_URL_PATH ) ?: '', '/' );
+                if ( $entry_path === $context_path ) {
+                    $score = min( 100, $score * 1.5 );
+                }
+            }
+
+            if ( $score > $highest_score ) {
+                $highest_score = $score;
+                $best_match = $entry;
+                $best_match['_match_score'] = round( $score, 2 );
+            }
+        }
+
+        // Threshold: 22 (slightly higher than KB since content chunks are noisier)
+        if ( $highest_score < 22 || ! $best_match ) return null;
+
+        // Build a response from the matched chunk
+        $best_match['answer'] = $best_match['chunk_text'];
+        $best_match['_source'] = 'site_content';
+
+        return $best_match;
+    }
+
+    /**
+     * Score a site content chunk against user query.
+     * Simplified version of score_entry() optimized for content chunks.
+     */
+    private static function score_site_chunk( $entry, $norm_query, $user_tokens ) {
+        // Combine title + heading + chunk for matching
+        $entry_text = strtolower(
+            ( $entry['title'] ?? '' ) . ' ' .
+            ( $entry['heading'] ?? '' ) . ' ' .
+            ( $entry['chunk_text'] ?? '' )
+        );
+        $entry_text = preg_replace( '/[^a-z0-9\s\-]/u', ' ', $entry_text );
+        $entry_text = preg_replace( '/\s+/', ' ', trim( $entry_text ) );
+
+        $entry_tokens = self::tokenize( $entry_text );
+
+        // 1. Token overlap score (40%)
+        $matched_tokens = 0;
+        foreach ( $user_tokens as $ut ) {
+            foreach ( $entry_tokens as $et ) {
+                if ( self::soft_match( $ut, $et ) ) { $matched_tokens++; break; }
+            }
+        }
+        $overlap_score = min( 100, ( $matched_tokens / max( 1, count( $user_tokens ) ) ) * 100 );
+
+        // 2. String similarity (25%)
+        // Use truncated entry text for performance
+        $compare_text = substr( $entry_text, 0, 500 );
+        similar_text( $norm_query, $compare_text, $sim_score );
+
+        // 3. Keyword match score (25%)
+        $kw_score = 0;
+        if ( ! empty( $entry['keywords'] ) ) {
+            $kws = json_decode( $entry['keywords'], true );
+            if ( is_array( $kws ) && ! empty( $kws ) ) {
+                $kw_matched = 0;
+                foreach ( $kws as $kw ) {
+                    $kw_norm = self::normalize_advanced( $kw );
+                    if ( ! empty( $kw_norm ) && strpos( $norm_query, $kw_norm ) !== false ) {
+                        $kw_matched++;
+                    }
+                }
+                $kw_score = min( 100, ( $kw_matched / count( $kws ) ) * 100 );
+            }
+        }
+
+        // 4. Title/heading exact match bonus (10%)
+        $title_bonus = 0;
+        $title_norm = self::normalize_advanced( $entry['title'] ?? '' );
+        $heading_norm = self::normalize_advanced( $entry['heading'] ?? '' );
+        if ( ! empty( $title_norm ) && strpos( $title_norm, $norm_query ) !== false ) {
+            $title_bonus = 100;
+        } elseif ( ! empty( $heading_norm ) && strpos( $heading_norm, $norm_query ) !== false ) {
+            $title_bonus = 80;
+        }
+
+        $final = ( $overlap_score * 0.40 ) + ( $sim_score * 0.25 ) + ( $kw_score * 0.25 ) + ( $title_bonus * 0.10 );
+
+        // Short query boost (same as KB)
+        if ( count( $user_tokens ) <= 2 && $matched_tokens > 0 ) {
+            $boost = ( $matched_tokens / count( $user_tokens ) ) * 15;
+            $final = min( 100, $final + $boost );
+        }
+
+        return $final;
+    }
+
+    /**
+     * Generate a response from a matched site content chunk.
+     * Adds source attribution and optional "Learn more" link.
+     */
+    public static function generate_site_content_response( $match, $lead = array() ) {
+        if ( empty( $match['chunk_text'] ) ) return null;
+
+        $first_name = '';
+        if ( ! empty( $lead['name'] ) ) {
+            $first_name = explode( ' ', $lead['name'] )[0];
+        }
+
+        $answer = $match['chunk_text'];
+
+        // Add heading context if available
+        $heading = $match['heading'] ?? '';
+        $title   = $match['title'] ?? '';
+
+        // Build a clean response
+        $response = '';
+
+        if ( $first_name ) {
+            $intros = array(
+                "Here's what I found, {$first_name}: ",
+                "Great question, {$first_name}! ",
+                "{$first_name}, ",
+            );
+            $response .= $intros[ array_rand( $intros ) ];
+        }
+
+        // If heading differs from title, include it as context
+        if ( ! empty( $heading ) && $heading !== $title ) {
+            $response .= "**{$heading}**\n\n";
+        }
+
+        $response .= $answer;
+
+        // Add "Learn more" source link
+        if ( ! empty( $match['source_url'] ) && ! empty( $title ) ) {
+            $response .= "\n\n📄 *Learn more: [" . $title . "](" . $match['source_url'] . ")*";
+        }
+
+        return $response;
+    }
+
+    /**
      * Score a single KB entry against the user query using a BM25-inspired hybrid approach.
      */
     private static function score_entry( $entry, $norm_query, $user_tokens, $idf, $detected_intent, $total_docs ) {

@@ -335,4 +335,89 @@ class SmartReplyr_DB {
             $wpdb->query( "DELETE FROM $table ORDER BY created_at ASC LIMIT $limit" );
         }
     }
+
+    /* ─── Site Content (Auto-Crawled KB) ─────── */
+
+    public static function get_site_content_table() {
+        global $wpdb;
+        return $wpdb->prefix . 'smartreplyr_site_content';
+    }
+
+    public static function insert_site_chunk( $data ) {
+        global $wpdb;
+        $table = self::get_site_content_table();
+        return $wpdb->insert( $table, array(
+            'post_id'      => intval( $data['post_id'] ),
+            'post_type'    => sanitize_text_field( $data['post_type'] ?? 'page' ),
+            'title'        => sanitize_text_field( $data['title'] ),
+            'heading'      => sanitize_text_field( $data['heading'] ?? '' ),
+            'chunk_text'   => sanitize_textarea_field( $data['chunk_text'] ),
+            'keywords'     => wp_json_encode( $data['keywords'] ?? array() ),
+            'source_url'   => esc_url_raw( $data['source_url'] ?? '' ),
+            'content_hash' => sanitize_text_field( $data['content_hash'] ),
+            'synced_at'    => current_time( 'mysql' ),
+        ) );
+    }
+
+    public static function chunk_exists_by_hash( $hash ) {
+        global $wpdb;
+        $table = self::get_site_content_table();
+        return (bool) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM $table WHERE content_hash = %s", $hash
+        ) );
+    }
+
+    public static function get_all_site_content() {
+        global $wpdb;
+        $table = self::get_site_content_table();
+        return $wpdb->get_results( "SELECT * FROM $table ORDER BY synced_at DESC", ARRAY_A );
+    }
+
+    public static function get_site_content_by_url( $url ) {
+        global $wpdb;
+        $table = self::get_site_content_table();
+        // Match by path to handle http/https and trailing slash differences
+        $path = rtrim( wp_parse_url( $url, PHP_URL_PATH ), '/' );
+        if ( empty( $path ) ) return array();
+        $like = '%' . $wpdb->esc_like( $path ) . '%';
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM $table WHERE source_url LIKE %s ORDER BY id ASC", $like
+        ), ARRAY_A );
+    }
+
+    public static function clear_site_content() {
+        global $wpdb;
+        $table = self::get_site_content_table();
+        return $wpdb->query( "TRUNCATE TABLE $table" );
+    }
+
+    public static function delete_site_content_by_post( $post_id ) {
+        global $wpdb;
+        $table = self::get_site_content_table();
+        return $wpdb->delete( $table, array( 'post_id' => intval( $post_id ) ) );
+    }
+
+    public static function get_site_content_stats() {
+        global $wpdb;
+        $table = self::get_site_content_table();
+        // Check table exists first
+        $exists = $wpdb->get_var( "SHOW TABLES LIKE '$table'" );
+        if ( $exists !== $table ) {
+            return array( 'total_chunks' => 0, 'total_pages' => 0, 'last_sync' => null );
+        }
+        return array(
+            'total_chunks' => intval( $wpdb->get_var( "SELECT COUNT(*) FROM $table" ) ),
+            'total_pages'  => intval( $wpdb->get_var( "SELECT COUNT(DISTINCT post_id) FROM $table" ) ),
+            'last_sync'    => $wpdb->get_var( "SELECT MAX(synced_at) FROM $table" ),
+        );
+    }
+
+    public static function get_site_content_paginated( $per_page = 20, $offset = 0 ) {
+        global $wpdb;
+        $table = self::get_site_content_table();
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM $table ORDER BY post_id ASC, id ASC LIMIT %d OFFSET %d",
+            $per_page, $offset
+        ), ARRAY_A );
+    }
 }

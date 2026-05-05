@@ -244,6 +244,27 @@ class SmartReplyr_REST_API {
                 error_log( '[SmartReplyr] NLP engine error: ' . $e->getMessage() );
             }
 
+            // STAGE 1.5: Try website content match (auto-crawled pages/posts)
+            if ( $reply === null ) {
+                try {
+                    $site_match = SmartReplyr_NLP::match_site_content( $message, $page_context, $lead );
+                    if ( $site_match && ! empty( $site_match['chunk_text'] ) ) {
+                        $reply = SmartReplyr_NLP::generate_site_content_response( $site_match, $lead );
+                        SmartReplyr_DB::add_log('chat', 'site_content', 'success', "Site content match for lead #$lead_id (score: " . ( $site_match['_match_score'] ?? 'n/a' ) . ")", array('query' => $message, 'source_url' => $site_match['source_url'] ?? ''));
+                        if ( $debug_mode === '1' ) {
+                            $debug_info = array(
+                                'source'     => 'site_content',
+                                'score'      => $site_match['_match_score'] ?? 0,
+                                'page_title' => $site_match['title'] ?? '',
+                                'source_url' => $site_match['source_url'] ?? '',
+                            );
+                        }
+                    }
+                } catch ( Throwable $e ) {
+                    error_log( '[SmartReplyr] Site content match error: ' . $e->getMessage() );
+                }
+            }
+
             // STAGE 2: Try OpenAI if NLP didn't match and API key exists
             if ( $reply === null ) {
                 try {
