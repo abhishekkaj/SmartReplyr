@@ -265,22 +265,9 @@ class SmartReplyr_REST_API {
                 }
             }
 
-            // STAGE 2: Try OpenAI if NLP didn't match and API key exists
-            if ( $reply === null ) {
-                try {
-                    $api_key = SmartReplyr_DB::get_setting( 'openai_api_key', '' );
-                    if ( ! empty( $api_key ) ) {
-                        $ai = new SmartReplyr_AI();
-                        $reply = $ai->get_response( $message, $messages, $page_context, $lead );
-                        SmartReplyr_DB::add_log('chat', 'ai_processor', 'success', "OpenAI response for lead #$lead_id", array('query' => $message));
-                        if ( $debug_mode === '1' ) {
-                            $debug_info = array( 'source' => 'openai' );
-                        }
-                    }
-                } catch ( Throwable $e ) {
-                    error_log( '[SmartReplyr] OpenAI error: ' . $e->getMessage() );
-                }
-            }
+            // STAGE 2: DISABLED — Strict KB-only mode. No external AI API calls.
+            // The chatbot ONLY returns answers from stored KB or crawled site content.
+            // OpenAI integration remains in code but is bypassed to prevent hallucination.
 
             // STAGE 3: Smart offline fallback (ALWAYS succeeds — never fails)
             if ( $reply === null || $reply === '' ) {
