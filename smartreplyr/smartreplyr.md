@@ -1,47 +1,67 @@
 # SmartReplyr - WordPress Plugin
 > Turn Visitors Into Leads Automatically
 
-**SmartReplyr** is a production-ready WordPress plugin for education institutes. It provides an AI-powered lead generation chatbot that captures visitor details first, then answers queries using a built-in KB-powered offline AI engine.
+**SmartReplyr** is a production-ready WordPress plugin for education institutes. It provides an AI-powered lead generation chatbot that captures visitor details first, then answers queries using a built-in KB-powered offline AI engine — enhanced by automatic website content scanning.
 
 ## Features
 
 1. **Lead Capture First** — Mandatory form (Name, Email, Phone, Course Interest) before chat access.
 2. **Offline AI Engine** — Self-contained NLP using BM25/TF-IDF scoring, synonym expansion, and morphological stemming. Works **without any API key**.
 3. **Knowledge Base (KB)** — Admin-managed Q&A store that acts as the AI's brain. More entries = smarter bot.
-4. **OpenAI Fallback** — Optional. If an API key is configured, OpenAI GPT is used when KB matching fails.
-5. **Flexible CRM Webhook** — Sends lead data to any CRM (LeadSquared, Zapier, Make) with fuzzy field mapping and custom lead source.
-6. **Email Notifications** — HTML email sent on lead capture via wp_mail or custom SMTP.
-7. **UTM & Lead Source Tracking** — Full UTM parameter capture + custom lead source field.
-8. **Tab-Aware Admin UI** — Settings organized by tabs; saving one tab never overwrites another.
-9. **Form Builder** — Add, remove, reorder, and customize form fields (Text, Email, Tel, Number, Select, Textarea, Checkbox).
-10. **Guest Visibility Hardened** — High-priority hooks ensure the widget loads on sites behind caches, security layers, or password protection.
-11. **GDPR Consent** — Configurable consent checkbox on the lead form.
-12. **Mobile Close Button** — X button in chatbot header for mobile users.
-13. **Quick Reply Chips** — Customizable suggested prompts shown after lead capture.
-14. **Custom Avatar & Branding** — WP Media Library integration for bot avatar; color picker for primary color.
-15. **Debug & Log System** — All AI responses, webhook deliveries, and email attempts are logged in a dedicated DB table viewable in the admin.
-16. **CSV Export** — All leads exportable to CSV from the admin dashboard.
+4. **Website Content Scanner** — Auto-crawls all WordPress pages & posts, chunks content by headings, extracts keywords, and makes it searchable by the chatbot. One-click sync from admin.
+5. **Page-Context Awareness** — Chatbot answers are boosted 1.5× for content from the page the user is currently viewing.
+6. **OpenAI Fallback** — Optional. If an API key is configured, OpenAI GPT is used when KB matching fails.
+7. **Flexible CRM Webhook** — Sends lead data to any CRM (LeadSquared, Zapier, Make) with fuzzy field mapping and custom lead source.
+8. **Email Notifications** — HTML email sent on lead capture via wp_mail or custom SMTP.
+9. **UTM & Lead Source Tracking** — Full UTM parameter capture + custom lead source field.
+10. **Tab-Aware Admin UI** — Settings organized by tabs; saving one tab never overwrites another.
+11. **Form Builder** — Add, remove, reorder, and customize form fields (Text, Email, Tel, Number, Select, Textarea, Checkbox).
+12. **Guest Visibility Hardened** — High-priority hooks ensure the widget loads on sites behind caches, security layers, or password protection.
+13. **GDPR Consent** — Configurable consent checkbox on the lead form.
+14. **Mobile Close Button** — X button in chatbot header for mobile users.
+15. **Quick Reply Chips** — Customizable suggested prompts shown after lead capture.
+16. **Custom Avatar & Branding** — WP Media Library integration for bot avatar; color picker for primary color.
+17. **Debug & Log System** — All AI responses, webhook deliveries, and email attempts are logged in a dedicated DB table viewable in the admin.
+18. **CSV Export** — All leads exportable to CSV from the admin dashboard.
+19. **Fault-Tolerant Pipeline** — Guaranteed response on every query; granular try/catch at each stage prevents silent failures.
+20. **Smart Widget UX** — Auto-retry on network errors, proper typing state management, contextual error messages.
 
 ## How the AI Works (No API Key Required)
 
 See **[SMARTREPLYR_BOT.md](./SMARTREPLYR_BOT.md)** for a complete plain-English + technical breakdown of the AI engine.
 
-### Decision Flow
+### Decision Flow (4-Stage Pipeline)
 
 ```
 User Message
     │
     ▼
-NLP Engine (class-smartreplyr-nlp.php)
-    ├── Normalize + Synonym Expand
+STAGE 1: Manual KB Match (class-smartreplyr-nlp.php)
+    ├── Normalize + Synonym Expand (13 categories, 150+ variants)
     ├── Tokenize + Stem
     ├── BM25 / TF-IDF score vs all KB entries
     ├── Intent detect → boost matching entries
-    └── Score ≥ 30?
+    ├── Short query boost (1-2 word queries get +20 score)
+    └── Score ≥ 18?
          ├── YES → generate_response() → fluent, personalized reply
-         └── NO  → OpenAI configured?
-                      ├── YES → OpenAI API → reply
-                      └── NO  → smart_fallback() → graceful intelligent reply
+         └── NO ↓
+
+STAGE 1.5: Website Content Match (auto-crawled pages/posts)
+    ├── Score site_content chunks using token overlap + keywords + similarity
+    ├── Page-context boost: 1.5× if user is on same page
+    └── Score ≥ 22?
+         ├── YES → generate_site_content_response() + "Learn more" link
+         └── NO ↓
+
+STAGE 2: OpenAI Fallback (if API key configured)
+    └── OpenAI API → reply
+
+STAGE 3: Smart Offline Fallback (always succeeds)
+    ├── Greeting / Thanks / Goodbye detection
+    ├── Contact / human request detection
+    ├── 10-topic intelligent fallback (fees, admission, courses, etc.)
+    ├── KB topic suggestion (partial match)
+    └── Generic helpful fallback
 ```
 
 ## API Structure
@@ -74,7 +94,7 @@ Namespace: `smartreplyr/v1`
 ### Form Builder
 `form_fields` (JSON)
 
-## Database Tables (5 Total)
+## Database Tables (6 Total)
 
 | Table | Purpose |
 |-------|---------|
@@ -82,11 +102,22 @@ Namespace: `smartreplyr/v1`
 | `wp_smartreplyr_conversations` | Full JSON chat history per lead |
 | `wp_smartreplyr_settings` | All plugin configuration (key-value) |
 | `wp_smartreplyr_knowledge_base` | Q&A entries that power the offline AI |
+| `wp_smartreplyr_site_content` | Auto-crawled website content chunks (title, heading, text, keywords, source_url) |
 | `wp_smartreplyr_logs` | Webhook, email, AI, and security event logs |
 
 ## Changelog
 
-### v2.2.3 (Current)
+### v2.3.0 (Current)
+- **Website Content Scanner:** Auto-crawls all WordPress pages & posts, extracts headings and paragraphs, chunks into searchable segments, auto-generates keywords — one-click from admin.
+- **4-Stage Chat Pipeline:** Manual KB → Website Content → OpenAI → Smart Fallback. Each stage is fault-tolerant with independent try/catch.
+- **Page-Context Awareness:** Content from the page the user is currently viewing gets a 1.5× score boost.
+- **Source Attribution:** Answers from website content include a "📄 Learn more: [Page Title](url)" link.
+- **NLP Engine Hardened:** Threshold lowered 30→18, short query boost (+20 for 1-2 word queries), 13-category synonym map with 150+ variants.
+- **10-Topic Smart Fallback:** Detects fees, admission, courses, placement, campus, hostel, ranking, exams, safety, online learning — gives rich topic-specific responses even without KB entries.
+- **Widget UX Fixes:** Auto-retry on failures, rate-limit detection, proper isTyping state management.
+- **REST API Hardened:** Rate limit increased 3→30 req/min, guaranteed response on every query.
+
+### v2.2.3
 - **Offline AI Engine:** Complete NLP overhaul using BM25/TF-IDF scoring, synonym expansion, n-gram phrase matching, intent detection, and morphological stemming — works 100% without OpenAI API.
 - **Fluent Response Generator:** KB answers are now transformed into personalized, conversational replies with lead's name, course context, and CTAs.
 - **Smart Fallback Layer:** Handles greetings, thank-you messages, and contact requests intelligently without any KB entry.
@@ -122,6 +153,6 @@ Namespace: `smartreplyr/v1`
 ## Future Roadmap
 
 - **Vector Embeddings:** Upgrade KB search to Weaviate/pgvector for semantic similarity.
-- **Website Scraper:** Auto-populate KB from institute website URLs.
 - **Human Handoff:** Live agent transfer mid-conversation.
 - **Multi-language Support:** Auto-translate responses for Hindi/regional language users.
+- **Auto-Sync on Publish:** Automatically re-crawl a page when it's updated or published.

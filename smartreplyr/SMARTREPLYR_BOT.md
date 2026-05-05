@@ -8,9 +8,9 @@
 SmartReplyr is a chatbot that lives on your website. When a visitor arrives, it pops up (automatically, after 5 seconds, or in a corner they can click) and does two things:
 
 1. **Captures the visitor's details** (Name, Email, Phone, Course Interest) before letting them chat.
-2. **Answers their questions** using your own custom Knowledge Base — like a smart FAQ that actually understands what they're asking.
+2. **Answers their questions** using your own custom Knowledge Base AND your website's actual content — like a smart FAQ that actually understands what they're asking.
 
-**The key difference from other chatbots:** SmartReplyr does NOT need any external AI subscription like ChatGPT to work. It has its own built-in AI engine that reads your Knowledge Base and gives accurate, personalized answers — for free, forever.
+**The key difference from other chatbots:** SmartReplyr does NOT need any external AI subscription like ChatGPT to work. It has its own built-in AI engine that reads your Knowledge Base + scans your website pages and gives accurate, personalized answers — for free, forever.
 
 ---
 
@@ -58,7 +58,13 @@ For each Q&A in your Knowledge Base, the bot calculates a **relevance score** (0
 - **Fallback token overlap** — any words in common
 
 ### Step 3: The Bot Picks the Best Match
-If the best score is **30 or above**, that answer is used. If not, the bot moves on.
+If the best score is **18 or above**, that answer is used. Short queries (1-2 words like "fees" or "location") get a +20 boost to help them cross the threshold. If no manual KB match is found, the bot moves on to **website content matching**.
+
+### Step 3.5: Website Content Matching (NEW)
+If the manual KB doesn't have a match, the bot searches **auto-crawled website content** — your actual pages and posts:
+- The bot knows which page the visitor is currently on, and **boosts answers from that page by 1.5×**
+- If a match is found, it returns the answer with a **"📄 Learn more"** link to the source page
+- This means the bot can answer questions about ANY content on your site, even if you didn't manually add it to the KB
 
 ### Step 4: The Bot Crafts a Personalized Reply
 The bot doesn't just copy-paste the KB answer. It:
@@ -67,13 +73,27 @@ The bot doesn't just copy-paste the KB answer. It:
 - Occasionally adds a **call-to-action** ("Would you like to schedule a campus visit? 📅")
 
 ### Step 5: Smart Fallback (if Nothing Matches)
-If the answer isn't in the KB:
-- **Greetings** ("Hi", "Hello", "Hey", "Namaste") → gets a warm, personalized welcome
-- **Thank-you messages** → gets a friendly acknowledgement
-- **Contact requests** → directed to the Contact page
-- **Anything else** → gets a helpful "I'll suggest what I can" message
+If the answer isn't in the KB or website content, the bot detects the **topic** of the question and gives a rich, helpful response:
 
-> 💡 **The more Q&A entries you add to the Knowledge Base, the smarter the bot becomes.** Every entry is a lesson.
+| Topic Detected | Response |
+|----------------|----------|
+| Greeting (hi, hello, namaste) | Warm personalized welcome with capability menu |
+| Thank-you (thanks, awesome, cool) | Varied friendly acknowledgements |
+| Goodbye (bye, later, done) | Warm farewell with invitation to return |
+| Contact request (speak, call, counselor) | Directs to admissions office with hours |
+| **Fees** (cost, payment, scholarship, EMI) | Fee structure overview + scholarship info |
+| **Admission** (apply, eligibility, cutoff) | Step-by-step admission process |
+| **Courses** (program, degree, specialization) | Program overview + course interest context |
+| **Placement** (job, salary, company, package) | Placement cell info + career opportunities |
+| **Campus** (location, infrastructure, library) | Campus facilities overview + visit invite |
+| **Hostel** (accommodation, mess, room) | Hostel amenities + security info |
+| **Ranking** (NAAC, NIRF, accreditation) | Credentials overview |
+| **Exam** (JEE, NEET, entrance) | Entrance exam guidance by program |
+| **Safety** (ragging, security, women) | Zero-tolerance policy + safety measures |
+| **Online** (distance, remote, e-learning) | Flexible learning options |
+| No match | Suggests related KB topics or helpful capability menu |
+
+> 💡 **The bot answers intelligently on 10+ topics even with ZERO KB entries — and gets even smarter with the Website Scanner.**
 
 ---
 
@@ -152,6 +172,36 @@ This tab allows you to completely customize the lead capture form:
 
 ---
 
+## 🔍 Website Content Scanner
+
+Go to **WordPress Admin > SmartReplyr > Website Scanner** to auto-index your site.
+
+### How It Works
+1. **Scan** — Crawls all published pages and posts via `WP_Query`
+2. **Chunk** — Splits content by H1–H4 headings into searchable segments (30–800 chars each)
+3. **Clean** — Strips shortcodes, scripts, styles, excessive whitespace
+4. **Keywords** — Auto-extracts top 10 keywords per chunk using term-frequency scoring
+5. **Dedup** — SHA256 hashing prevents duplicate content
+6. **Store** — Each chunk is saved with: page title, heading, text, keywords, and source URL
+
+### Controls
+| Button | What it does |
+|--------|--------------|
+| 🔄 Sync Website Content | Scans all published pages/posts and indexes new content |
+| ♻️ Clear & Full Re-Sync | Clears all indexed content and re-scans everything from scratch |
+
+### Stats Dashboard
+- **Pages Indexed** — How many unique pages/posts have been crawled
+- **Content Chunks** — Total number of searchable content segments
+- **Available Pages** — How many published pages/posts exist on the site
+- **Last Sync** — When the scanner last ran
+
+> 💡 **Pro tip:** Re-sync after updating your website content. The chatbot will immediately start answering questions from the updated pages.
+
+> ⚠️ **Gmail users:** You must use an **App Password**, not your regular Gmail password. Enable 2-factor authentication on your Google account first.
+
+---
+
 ## 📊 Where Lead Data Goes
 
 Every submitted lead is saved in the WordPress database and visible under **SmartReplyr > Leads**. Each lead record contains:
@@ -207,8 +257,9 @@ smartreplyr/
 ├── smartreplyr.php                  # Plugin bootstrap, constants, hooks
 ├── includes/
 │   ├── class-smartreplyr-activator.php   # DB creation, migration, seed defaults
-│   ├── class-smartreplyr-db.php          # All DB queries (leads, KB, settings, logs)
-│   ├── class-smartreplyr-nlp.php         # ★ Offline AI Engine (BM25, synonyms, stemming)
+│   ├── class-smartreplyr-db.php          # All DB queries (leads, KB, site_content, settings, logs)
+│   ├── class-smartreplyr-nlp.php         # ★ Offline AI Engine (BM25, synonyms, stemming, site content matching)
+│   ├── class-smartreplyr-crawler.php     # ★ Website Content Scanner (crawl, chunk, keyword extraction)
 │   ├── class-smartreplyr-ai.php          # OpenAI API integration (optional fallback)
 │   ├── class-smartreplyr-rest-api.php    # All REST endpoints (/lead, /chat, /knowledge)
 │   ├── class-smartreplyr-webhook.php     # CRM webhook delivery with fuzzy mapping
@@ -216,7 +267,7 @@ smartreplyr/
 │   └── class-smartreplyr-loader.php      # Hook registration manager
 ├── public/
 │   ├── class-smartreplyr-public.php      # Script enqueuing + widget root render
-│   ├── js/widget.js                      # Frontend chatbot widget (Vanilla JS)
+│   ├── js/widget.js                      # Frontend chatbot widget (Vanilla JS, auto-retry)
 │   └── css/widget.css                    # Widget styles (glassmorphism, mobile-first)
 ├── admin/
 │   ├── class-smartreplyr-admin.php       # Admin menu, settings save (tab-aware), AJAX
@@ -228,12 +279,14 @@ smartreplyr/
 │       ├── admin-leads.php               # Leads list + filter + CSV export
 │       ├── admin-conversations.php       # Chat history viewer
 │       ├── admin-knowledge-base.php      # KB entry manager
+│       ├── admin-website-scanner.php     # ★ Website content scanner UI
 │       └── sections/
 │           ├── general.php               # General + AI tab
 │           ├── avatar.php                # Branding tab
 │           ├── crm.php                   # CRM Webhook tab
 │           ├── email.php                 # Email + SMTP tab
-│           └── test-bot.php             # Live bot simulator tab
+│           ├── form-builder.php          # Form Builder tab
+│           └── test-bot.php              # Live bot simulator tab
 └── assets/
     └── img/default-avatar.svg           # Default bot avatar
 ```
@@ -245,7 +298,14 @@ smartreplyr/
 2. Calls `normalize_advanced()` + `tokenize()` on the user query
 3. Computes IDF (Inverse Document Frequency) for user tokens across the KB
 4. Iterates KB entries, calls `score_entry()` for each
-5. Returns the best match if score ≥ 30, else null
+5. Short query boost: 1-2 word queries get +20 if tokens directly match
+6. Returns the best match if score ≥ 18, else null
+
+#### `match_site_content($user_query, $page_context, $lead_context)` — Website Content Matching
+1. Loads all chunks from `site_content` table
+2. Scores each chunk using token overlap (40%), string similarity (25%), keyword match (25%), title/heading bonus (10%)
+3. Applies page-context boost: 1.5× if user is currently on the same page
+4. Returns best match if score ≥ 22, with source URL for "Learn more" link
 
 #### `score_entry()` — Hybrid Scorer
 | Component | Weight | Method |
@@ -261,7 +321,7 @@ smartreplyr/
 1. Lowercase + HTML decode
 2. Strip punctuation (keep a-z, 0-9, spaces, hyphens)
 3. Remove stopwords (a, the, is, for, how, what, etc.)
-4. Call `expand_synonyms()` — maps 40+ common variants to canonical terms
+4. Call `expand_synonyms()` — maps 150+ common variants across 13 categories to canonical terms (fees, admission, courses, campus, placement, duration, contact, ranking, scholarship, hostel, exam, online, safety)
 5. Return clean string
 
 #### `generate_response($match, $lead, $history)`
@@ -281,7 +341,8 @@ smartreplyr/
 
 ### REST API Security
 - **Nonce:** HMAC-SHA256 derived from WordPress salt — stateless, cache-safe, no session required
-- **Rate Limiting:** Max 3 requests/minute per IP, enforced via WP transients
+- **Rate Limiting:** Max 30 requests/minute per IP, enforced via WP transients
+- **Fault Tolerance:** Chat endpoint always returns `success: true` with a reply — even if the entire AI pipeline crashes
 - **Admin endpoints:** Standard `current_user_can('manage_options')` check
 
 ### Settings Save Architecture (Tab-Aware)
@@ -330,3 +391,9 @@ A: Gmail requires you to use an **App Password** (not your normal password). Als
 
 **Q: How do I update the chatbot's suggested chips?**  
 A: Go to General & Bot UI tab → Quick Reply Prompts → enter comma-separated values → Save.
+
+**Q: What is the Website Scanner?**  
+A: The Website Scanner (SmartReplyr > Website Scanner) auto-crawls all your published pages and posts, extracts the text content, and makes it searchable by the chatbot. Click "Sync Website Content" after updating your site. The bot will then answer questions based on your actual website content — no manual KB entries needed.
+
+**Q: Does the chatbot know which page the visitor is on?**  
+A: Yes! The chatbot receives the visitor's current page URL. When searching website content, answers from the same page are boosted 1.5× — making responses contextually relevant to what the visitor is reading.
