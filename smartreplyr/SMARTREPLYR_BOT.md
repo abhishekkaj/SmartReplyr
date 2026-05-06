@@ -10,7 +10,7 @@ SmartReplyr is a chatbot that lives on your website. When a visitor arrives, it 
 1. **Captures the visitor's details** (Name, Email, Phone, Course Interest) before letting them chat.
 2. **Answers their questions** using your own custom Knowledge Base AND your website's actual content — like a smart FAQ that actually understands what they're asking.
 
-**The key difference from other chatbots:** SmartReplyr is a **strict, high-trust system**. It does NOT guess or "generate" information. It only answers if it finds a high-confidence match (65%+) in your Knowledge Base or website content. No hallucinations, no AI subscriptions, 100% control.
+**The key difference from other chatbots:** SmartReplyr is a **strict, high-trust system**. It does NOT guess or "generate" information. It only answers if it finds a high-confidence match (45%+) in your Knowledge Base or website content. No hallucinations, no AI subscriptions, 100% control.
 
 ---
 

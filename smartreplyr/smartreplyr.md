@@ -10,7 +10,7 @@
 3. **Knowledge Base (KB)** — Admin-managed Q&A store that acts as the AI's brain. More entries = smarter bot.
 4. **Website Content Scanner** — Auto-crawls all WordPress pages & posts, chunks content by headings, extracts keywords, and makes it searchable by the chatbot. One-click sync from admin.
 5. **Page-Context Awareness** — Chatbot answers are boosted 1.5× for content from the page the user is currently viewing.
-6. **Strict Answering Mode** — Never guesses or generates unknown info. Requires 65% match confidence.
+6. **Strict Answering Mode** — Never guesses or generates unknown info. Requires 45% match confidence.
 7. **No AI Dependency** — Operates 100% locally. OpenAI fallback is available but disabled by default to maintain high trust.
 8. **Email Notifications** — HTML email sent on lead capture via wp_mail or custom SMTP.
 9. **UTM & Lead Source Tracking** — Full UTM parameter capture + custom lead source field.
@@ -42,14 +42,14 @@ STAGE 1: Manual KB Match (class-smartreplyr-nlp.php)
     ├── Tokenize + Stem
     ├── BM25 / TF-IDF score vs all KB entries
     ├── Intent detect → boost matching entries
-    └── Score ≥ 65%?
+    └── Score ≥ 45%?
          ├── YES → generate_response() → verbatim KB answer + source
          └── NO ↓
 
 STAGE 1.5: Website Content Match (auto-crawled pages/posts)
     ├── Score site_content chunks using token overlap + keywords + similarity
     ├── Page-context boost: 1.5× if user is on same page
-    └── Score ≥ 65%?
+    └── Score ≥ 45%?
          ├── YES → generate_site_content_response() + source link
          └── NO ↓
 
@@ -106,7 +106,7 @@ Namespace: `smartreplyr/v1`
 ## Changelog
 
 - **Excel/CSV KB Import:** Added a native, dependency-free import system for .xlsx and .csv files. Supports Append/Replace modes and provides a downloadable template.
-- **Strict KB-Only Mode:** Raised thresholds (18/22 → 65%), removed score padding, and added hard filter (min 20 chars) to ensure zero hallucinations.
+- **Strict KB-Only Mode:** Raised thresholds (18/22 → 45%), removed score padding, and added hard filter (min 20 chars) to ensure zero hallucinations.
 - **Verbatim Responses:** Removed random greetings, CTAs, and course injections from AI replies. What you put in the KB is exactly what the user sees.
 - **Safe Fallbacks:** Gutted topic-specific fallback generation. The bot now only handles social intents and safe redirects to human teams.
 - **OpenAI Disabled:** Bypassed Stage 2 to ensure 100% data control and trust.

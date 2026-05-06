@@ -6,7 +6,7 @@
     <hr class="wp-header-end">
     
     <div class="notice notice-info">
-        <p>This knowledge base trains the AI. When a student asks a question, the AI will search these entries first before falling back to generic answers. The AI requires a strict 65% confidence match to answer.</p>
+        <p>This knowledge base trains the AI. When a student asks a question, the AI will search these entries first before falling back to generic answers. The AI requires a strict 45% confidence match to answer.</p>
     </div>
 
     <!-- Import KB UI (Hidden by default) -->

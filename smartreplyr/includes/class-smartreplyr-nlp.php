@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * 
  * STRICT RULES:
  *  - NEVER generates or assumes information
- *  - NEVER returns loosely matched answers (threshold: 65%)
+ *  - NEVER returns loosely matched answers (threshold: 45%)
  *  - ALWAYS fails safely with controlled fallback
  *  - Zero hallucination guarantee
  * 
