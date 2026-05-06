@@ -499,15 +499,7 @@ class SmartReplyr_NLP {
             }
         }
 
-        // Fallback: token overlap vs entry tokens
-        if ( empty( $entry_tokens ) ) return 0;
-        $matched = 0;
-        foreach ( $user_tokens as $ut ) {
-            foreach ( $entry_tokens as $et ) {
-                if ( self::soft_match( $ut, $et ) ) { $matched++; break; }
-            }
-        }
-        return min( 100, ( $matched / max( 1, count( $user_tokens ) ) ) * 100 );
+        return 0;
     }
 
     /**
