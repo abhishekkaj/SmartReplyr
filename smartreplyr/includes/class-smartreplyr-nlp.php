@@ -39,26 +39,22 @@ class SmartReplyr_NLP {
         // Phase 1: Intent detection
         $detected_intent = self::detect_intent( $normalized_query, $user_tokens, $kb_entries );
 
-        $best_match   = null;
+        $best_match    = null;
         $highest_score = 0;
 
-        $total_docs = count( $kb_entries );
-        // Pre-compute IDF for all tokens
-        $idf = self::compute_idf( $user_tokens, $kb_entries, $total_docs );
-
         foreach ( $kb_entries as $entry ) {
-            $score = self::score_entry( $entry, $normalized_query, $user_tokens, $idf, $detected_intent, $total_docs );
+            $score = self::score_entry( $entry, $normalized_query, $user_tokens, $detected_intent );
 
             if ( $score > $highest_score ) {
                 $highest_score = $score;
-                $entry['_match_score']   = round( $score, 2 );
-                $entry['_intent']        = $detected_intent;
-                $best_match   = $entry;
+                $entry['_match_score'] = round( $score, 2 );
+                $entry['_intent']      = $detected_intent;
+                $best_match = $entry;
             }
         }
 
-        // Strict threshold: 65 — only return confident matches, never guess
-        if ( $highest_score < 65 || ! $best_match ) return null;
+        // Threshold: 45 — confident enough without being so strict every real query fails
+        if ( $highest_score < 45 || ! $best_match ) return null;
 
         // Hard filter: reject if the KB answer is too short to be meaningful
         $answer_len = strlen( trim( $best_match['answer'] ?? '' ) );
@@ -112,8 +108,8 @@ class SmartReplyr_NLP {
             }
         }
 
-        // Strict threshold: 65 — only return confident matches from site content
-        if ( $highest_score < 65 || ! $best_match ) return null;
+        // Threshold: 45 — confident enough without being overly strict
+        if ( $highest_score < 45 || ! $best_match ) return null;
 
         // Hard filter: reject if chunk text is too short
         if ( strlen( trim( $best_match['chunk_text'] ?? '' ) ) < 20 ) return null;
@@ -223,31 +219,43 @@ class SmartReplyr_NLP {
     /**
      * Score a single KB entry against the user query using a BM25-inspired hybrid approach.
      */
-    private static function score_entry( $entry, $norm_query, $user_tokens, $idf, $detected_intent, $total_docs ) {
+    private static function score_entry( $entry, $norm_query, $user_tokens, $detected_intent ) {
         $entry_question = self::normalize_advanced( $entry['question'] );
         $entry_tokens   = self::tokenize( $entry_question );
 
-        // --- 1. Token Overlap Score (40%) ---
-        $matched_tokens = 0;
+        // Also normalize answer text for matching against
+        $answer_text    = self::normalize_advanced( strip_tags( $entry['answer'] ?? '' ) );
+        $answer_tokens  = self::tokenize( $answer_text );
+
+        // --- 1. Token Overlap vs Question (50%) ---
+        $matched_q = 0;
         foreach ( $user_tokens as $ut ) {
             foreach ( $entry_tokens as $et ) {
-                if ( self::soft_match( $ut, $et ) ) { $matched_tokens++; break; }
+                if ( self::soft_match( $ut, $et ) ) { $matched_q++; break; }
             }
         }
-        $overlap_score = min( 100, ( $matched_tokens / max( 1, count( $user_tokens ) ) ) * 100 );
+        $overlap_q = min( 100, ( $matched_q / max( 1, count( $user_tokens ) ) ) * 100 );
 
-        // --- 2. String Similarity Score (20%) ---
+        // --- 1b. Token Overlap vs Answer (10%) ---
+        $matched_a = 0;
+        foreach ( $user_tokens as $ut ) {
+            foreach ( $answer_tokens as $at ) {
+                if ( self::soft_match( $ut, $at ) ) { $matched_a++; break; }
+            }
+        }
+        $overlap_a = min( 100, ( $matched_a / max( 1, count( $user_tokens ) ) ) * 100 );
+
+        // --- 2. String Similarity vs Question (15%) ---
         similar_text( $norm_query, $entry_question, $sim_score );
 
-        // --- 3. Keyword Overlap Score (30%) ---
+        // --- 3. Keyword Score (20%) ---
         $kw_score = self::keyword_score( $norm_query, $user_tokens, $entry, $entry_tokens );
 
-        // --- 4. Exact phrase bonus (10%) ---
+        // --- 4. Exact phrase bonus (5%) ---
         $exact_bonus = 0;
         if ( strpos( $entry_question, $norm_query ) !== false || strpos( $norm_query, $entry_question ) !== false ) {
             $exact_bonus = 100;
         } else {
-            // Sliding window phrase match
             $chunks = self::get_ngrams( $user_tokens, 3 );
             foreach ( $chunks as $chunk ) {
                 if ( strpos( $entry_question, $chunk ) !== false ) {
@@ -256,21 +264,21 @@ class SmartReplyr_NLP {
             }
         }
 
-        // Dynamic weighting for short queries
+        // Dynamic weighting
         if ( count( $user_tokens ) <= 2 ) {
-            // Drop sim_score penalty for short queries
-            $final = ( $overlap_score * 0.45 ) + ( $kw_score * 0.40 ) + ( $exact_bonus * 0.15 );
+            // For short queries: lean heavily on keyword and token overlap
+            $final = ( $overlap_q * 0.50 ) + ( $kw_score * 0.35 ) + ( $overlap_a * 0.10 ) + ( $exact_bonus * 0.05 );
         } else {
-            $final = ( $overlap_score * 0.40 ) + ( $sim_score * 0.20 ) + ( $kw_score * 0.30 ) + ( $exact_bonus * 0.10 );
+            $final = ( $overlap_q * 0.50 ) + ( $sim_score * 0.15 ) + ( $kw_score * 0.20 ) + ( $overlap_a * 0.10 ) + ( $exact_bonus * 0.05 );
         }
 
         // Intent match bonus
         if ( $detected_intent && ! empty( $entry['intent'] ) && strtolower( trim( $entry['intent'] ) ) === $detected_intent ) {
             $final = min( 100, $final * 1.25 );
         }
-        // Intent mismatch penalty (only if both exist)
+        // Intent mismatch penalty — ONLY if both sides have an intent defined
         if ( $detected_intent && ! empty( $entry['intent'] ) && strtolower( trim( $entry['intent'] ) ) !== $detected_intent ) {
-            $final *= 0.60;
+            $final *= 0.80; // Softer penalty: was 0.60
         }
 
         return $final;
