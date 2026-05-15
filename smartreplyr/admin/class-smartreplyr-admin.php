@@ -152,7 +152,7 @@ class SmartReplyr_Admin {
                     $val = sanitize_hex_color( $val );
                 } elseif ( $field === 'avatar_url' || $field === 'webhook_url' ) {
                     $val = esc_url_raw( $val );
-                } elseif ( $field === 'notification_email' ) {
+                } elseif ( $field === 'notification_email' || $field === 'contact_email' ) {
                     $val = sanitize_email( $val );
                 } elseif ( $field === 'system_prompt' || $field === 'welcome_message' || $field === 'fallback_message' || $field === 'gdpr_text' ) {
                     $val = sanitize_textarea_field( $val );

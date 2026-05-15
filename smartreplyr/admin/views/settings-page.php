@@ -60,6 +60,7 @@ if ( ! function_exists('smartreplyr_render_section') ) {
         <?php $active_tab = isset( $_GET['tab'] ) ? sanitize_text_field($_GET['tab']) : 'general'; ?>
         <a href="?page=smartreplyr-settings&tab=general" class="nav-tab <?php echo $active_tab == 'general' ? 'nav-tab-active' : ''; ?>">General & Bot UI</a>
         <a href="?page=smartreplyr-settings&tab=avatar" class="nav-tab <?php echo $active_tab == 'avatar' ? 'nav-tab-active' : ''; ?>">Avatar & Branding</a>
+        <a href="?page=smartreplyr-settings&tab=contact" class="nav-tab <?php echo $active_tab == 'contact' ? 'nav-tab-active' : ''; ?>">📞 Contact Info</a>
         <a href="?page=smartreplyr-settings&tab=crm" class="nav-tab <?php echo $active_tab == 'crm' ? 'nav-tab-active' : ''; ?>">CRM Webhook</a>
         <a href="?page=smartreplyr-settings&tab=email" class="nav-tab <?php echo $active_tab == 'email' ? 'nav-tab-active' : ''; ?>">Email & SMTP</a>
         <a href="?page=smartreplyr-settings&tab=form-builder" class="nav-tab <?php echo $active_tab == 'form-builder' ? 'nav-tab-active' : ''; ?>">Form Builder</a>
@@ -80,6 +81,8 @@ if ( ! function_exists('smartreplyr_render_section') ) {
                 smartreplyr_render_section('general');
             } elseif ($active_tab === 'avatar') {
                 smartreplyr_render_section('avatar');
+            } elseif ($active_tab === 'contact') {
+                smartreplyr_render_section('contact');
             } elseif ($active_tab === 'crm') {
                 smartreplyr_render_section('crm');
             } elseif ($active_tab === 'email') {
