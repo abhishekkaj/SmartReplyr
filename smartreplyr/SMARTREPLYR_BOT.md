@@ -63,11 +63,11 @@ If the best score is **65 or above**, that answer is used. This is a strict thre
 ### Step 3.5: Website Content Matching (NEW)
 If the manual KB doesn't have a match, the bot searches **auto-crawled website content** — your actual pages and posts:
 - The bot knows which page the visitor is currently on, and **boosts answers from that page by 1.5×**
-- If a match is found with a score of **65 or above**, it returns the answer with a source link.
-- This means the bot can answer questions about ANY content on your site, but only if it's 100% sure.
+- If a match is found with a score of **40–55+** (depending on query length), it returns the answer.
+- This means the bot can answer questions about ANY content on your site, but only if it's sure.
 
 ### Step 4: The Bot Delivers a Verbatim Reply
-The bot returns the content exactly as stored in your Knowledge Base or on your website. It only replaces basic placeholders (like `{{lead_name}}`). It does not add random greetings or calls-to-action, ensuring 100% accuracy and trust.
+The bot returns the content exactly as stored in your Knowledge Base or on your website. It only replaces basic placeholders (like `{{lead_name}}`). It does not add source links or random greetings, ensuring 100% accuracy and trust.
 
 ### Step 5: Smart Fallback (Social & Safe Redirects)
 If the answer isn't in the KB or website content, the bot **never guesses**. Instead, it handles social intents or provides a safe fallback:
@@ -77,7 +77,7 @@ If the answer isn't in the KB or website content, the bot **never guesses**. Ins
 | Greeting (hi, hello) | Warm welcome to the institute. |
 | Thanks (thank you) | Polite acknowledgement. |
 | Goodbye (bye, tata) | Friendly farewell. |
-| Contact (call, human) | Redirects to the **Contact Us** page or Admissions office. |
+| Contact (call, apply) | Shows your **Helpline, WhatsApp, and Email** from Settings. |
 | **Anything Else** | "I don't have that exact info... Please contact our team." |
 
 > 💡 **SmartReplyr prioritizes accuracy over everything else.** It's better to say "I don't know" than to give a wrong answer.
@@ -101,7 +101,14 @@ Go to **WordPress Admin > SmartReplyr > Settings** to find these tabs:
 | Debug Mode | Logs AI source, intent, and match score for each reply |
 | GDPR Consent | Toggle the consent checkbox on the lead form |
 
-### Tab 2: Avatar & Branding
+### Tab 2: 📞 Contact Info (NEW)
+| Setting | What it does |
+|---------|-------------|
+| Contact Email | The email shown when the user asks to connect/contact |
+| Contact Phone | The helpline number shown to users |
+| WhatsApp Number | The number used for WhatsApp redirect/display |
+
+### Tab 3: Avatar & Branding
 | Setting | What it does |
 |---------|-------------|
 | Primary Color | Widget button and header gradient color |
@@ -318,13 +325,13 @@ smartreplyr/
 3. Computes IDF (Inverse Document Frequency) for user tokens across the KB
 4. Iterates KB entries, calls `score_entry()` for each
 5. Hard filter: Rejects matches if the answer is too short (< 20 chars)
-6. Returns the best match if score ≥ 65, else null
+6. Returns the best match if score ≥ threshold (40–55), else null
 
 #### `match_site_content($user_query, $page_context, $lead_context)` — Website Content Matching
 1. Loads all chunks from `site_content` table
 2. Scores each chunk using token overlap (40%), string similarity (25%), keyword match (25%), title/heading bonus (10%)
 3. Applies page-context boost: 1.5× if user is currently on the same page
-4. Returns best match if score ≥ 65, with source URL link
+4. Returns best match if score ≥ threshold (40–55)
 
 #### `score_entry()` — Hybrid Scorer
 | Component | Weight | Method |
@@ -334,7 +341,8 @@ smartreplyr/
 | Keyword Overlap | 25% | Exact KB keyword match or token intersection |
 | Exact Phrase Bonus | 10% | Full query substring match or n-gram match |
 | Intent Match Boost | ×1.25 | Applied when detected intent matches entry intent |
-| Intent Mismatch Penalty | ×0.60 | Applied when intents conflict |
+| Intent Mismatch Penalty | ×0.80 | Softer penalty applied when intents conflict |
+| Intent Mismatch Guard | +25 | Adds 25 points to threshold if intents don't match (prevents wrong-category answers) |
 
 #### `normalize_advanced($text)`
 1. Lowercase + HTML decode
@@ -346,8 +354,7 @@ smartreplyr/
 #### `generate_response($match, $lead, $history)`
 - Takes the matched KB `answer` field verbatim.
 - Replaces `{{institute_name}}` and `{{lead_name}}` placeholders.
-- Adds source attribution label if available.
-- **Strict Mode:** No greetings, CTA injections, or course mentions.
+- **Strict Mode:** No source links, greetings, CTA injections, or course mentions.
 
 #### `smart_fallback($user_query, $lead, $history)`
 | Trigger | Response |

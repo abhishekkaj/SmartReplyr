@@ -53,8 +53,22 @@ class SmartReplyr_NLP {
             }
         }
 
-        // Threshold: 45 — confident enough without being so strict every real query fails
-        if ( $highest_score < 45 || ! $best_match ) return null;
+        // Dynamic threshold: short queries need less confidence, multi-concept queries need more
+        $token_count = count( $user_tokens );
+        if ( $token_count <= 1 ) {
+            $threshold = 40;
+        } elseif ( $token_count <= 3 ) {
+            $threshold = 45;
+        } else {
+            $threshold = 55; // Multi-concept queries require stronger match
+        }
+
+        // Extra guard: if detected intent doesn't match the best match intent, require higher confidence
+        if ( $detected_intent && ! empty( $best_match['intent'] ) && strtolower( trim( $best_match['intent'] ) ) !== $detected_intent ) {
+            $threshold = min( 85, $threshold + 25 );
+        }
+
+        if ( $highest_score < $threshold || ! $best_match ) return null;
 
         // Hard filter: reject if the KB answer is too short to be meaningful
         $answer_len = strlen( trim( $best_match['answer'] ?? '' ) );
@@ -208,11 +222,6 @@ class SmartReplyr_NLP {
             $response = "**{$heading}**\n\n" . $response;
         }
 
-        // Source attribution link — always show where the answer came from
-        if ( ! empty( $match['source_url'] ) && ! empty( $title ) ) {
-            $response .= "\n\n📄 *Source: [" . $title . "](" . $match['source_url'] . ")*";
-        }
-
         return $response;
     }
 
@@ -305,13 +314,7 @@ class SmartReplyr_NLP {
             $answer = str_replace( '{{lead_name}}', esc_html( $first_name ), $answer );
         }
 
-        // Source attribution (if KB entry has category/intent metadata)
-        $source_label = '';
-        if ( ! empty( $match['category'] ) && $match['category'] !== 'general' ) {
-            $source_label = "\n\n📋 *Source: " . ucfirst( $match['category'] ) . " Knowledge Base*";
-        }
-
-        return $answer . $source_label;
+        return $answer;
     }
 
     /**
@@ -360,9 +363,29 @@ class SmartReplyr_NLP {
         }
 
         // ── 4. Contact / human request ──
-        $contact_triggers = array( 'speak', 'talk', 'contact', 'human', 'person', 'phone number', 'real person', 'agent', 'counselor', 'counsellor', 'advisor', 'representative', 'call' );
+        $contact_triggers = array( 'speak', 'talk', 'contact', 'human', 'person', 'phone number', 'real person', 'agent', 'counselor', 'counsellor', 'advisor', 'representative', 'call', 'apply', 'connect', 'reach', 'whatsapp', 'email', 'mail', 'enquiry', 'inquiry' );
         foreach ( $contact_triggers as $t ) {
             if ( strpos( $normalized, $t ) !== false ) {
+                // Build contact block from settings
+                $contact_email   = SmartReplyr_DB::get_setting( 'contact_email', '' );
+                $contact_phone   = SmartReplyr_DB::get_setting( 'contact_phone', '' );
+                $contact_whatsapp = SmartReplyr_DB::get_setting( 'contact_whatsapp', '' );
+
+                $contact_lines = array();
+                if ( ! empty( $contact_phone ) ) {
+                    $contact_lines[] = "📞 **Call us:** " . $contact_phone;
+                }
+                if ( ! empty( $contact_whatsapp ) ) {
+                    $contact_lines[] = "💬 **WhatsApp:** " . $contact_whatsapp;
+                }
+                if ( ! empty( $contact_email ) ) {
+                    $contact_lines[] = "📧 **Email:** " . $contact_email;
+                }
+
+                $intro = "I'd love to connect you with our team{$name_part}! Here's how you can reach us:\n\n";
+                if ( ! empty( $contact_lines ) ) {
+                    return $intro . implode( "\n", $contact_lines );
+                }
                 return "I'd be happy to connect you with our team{$name_part}! Please visit the **Contact Us** page on our website, or reach out to our admissions office directly for personalized assistance.";
             }
         }

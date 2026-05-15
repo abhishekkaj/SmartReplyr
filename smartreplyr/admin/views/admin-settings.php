@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 try {
 ?>
 <div class="wrap smartreplyr-wrap">
@@ -9,6 +9,7 @@ try {
     
     <h2 class="nav-tab-wrapper">
         <a href="?page=smartreplyr-settings&tab=general" class="nav-tab <?php echo $active_tab == 'general' ? 'nav-tab-active' : ''; ?>">General & Widget</a>
+        <a href="?page=smartreplyr-settings&tab=contact" class="nav-tab <?php echo $active_tab == 'contact' ? 'nav-tab-active' : ''; ?>">&#128222; Contact Info</a>
         <a href="?page=smartreplyr-settings&tab=ai" class="nav-tab <?php echo $active_tab == 'ai' ? 'nav-tab-active' : ''; ?>">AI Engine Config</a>
         <a href="?page=smartreplyr-settings&tab=webhook" class="nav-tab <?php echo $active_tab == 'webhook' ? 'nav-tab-active' : ''; ?>">CRM Webhook</a>
         <a href="?page=smartreplyr-settings&tab=email" class="nav-tab <?php echo $active_tab == 'email' ? 'nav-tab-active' : ''; ?>">Email & SMTP</a>
@@ -79,7 +80,36 @@ try {
                 </tr>
             </table>
             
-            <?php elseif ( $active_tab == 'ai' ) : ?>
+            <?php endif; ?>
+
+            <?php if ( $active_tab == 'contact' ) : ?>
+            <!-- ── Contact Info ── -->
+            <table class="form-table">
+                <tr><td colspan="2"><p class="description" style="font-size:14px;padding:10px;background:#fff3cd;border-left:4px solid #ffc107;margin-bottom:10px;">⚡ <strong>These details are shown by the bot</strong> when a user says things like "contact", "call", "apply", "WhatsApp", "email me", etc.</p></td></tr>
+                <tr>
+                    <th scope="row"><label for="contact_email">Contact Email</label></th>
+                    <td>
+                        <input name="contact_email" type="email" id="contact_email" value="<?php echo esc_attr( $settings['contact_email'] ?? '' ); ?>" class="regular-text" placeholder="admissions@example.com">
+                        <p class="description">Shown when user asks to email or contact.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="contact_phone">Contact Phone / Helpline</label></th>
+                    <td>
+                        <input name="contact_phone" type="text" id="contact_phone" value="<?php echo esc_attr( $settings['contact_phone'] ?? '' ); ?>" class="regular-text" placeholder="+91 98765 43210">
+                        <p class="description">Shown when user asks to call or contact.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="contact_whatsapp">WhatsApp Number</label></th>
+                    <td>
+                        <input name="contact_whatsapp" type="text" id="contact_whatsapp" value="<?php echo esc_attr( $settings['contact_whatsapp'] ?? '' ); ?>" class="regular-text" placeholder="+91 98765 43210">
+                        <p class="description">Shown when user mentions WhatsApp or asks to chat.</p>
+                    </td>
+                </tr>
+            </table>
+
+            <?php elseif ( $active_tab == 'general' ) : ?>
             <!-- ── AI Config ── -->
             <table class="form-table">
                 <tr>

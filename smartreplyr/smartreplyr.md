@@ -26,6 +26,8 @@
 19. **Fault-Tolerant Pipeline** — Guaranteed response on every query; granular try/catch at each stage prevents silent failures.
 20. **Smart Widget UX** — Auto-retry on network errors, proper typing state management, contextual error messages.
 21. **Excel/CSV KB Import** — Bulk upload Q&A entries using .xlsx or .csv files with strict validation and replace/append modes. Includes a downloadable template.
+22. **Dynamic Contact Info** — Dedicated settings tab for Email, Phone, and WhatsApp. Bot automatically shows these when contact intent is detected.
+23. **Source-Link Free** — Removed "Source: Knowledge Base" links for a cleaner, higher-trust look.
 
 ## How the AI Works (No API Key Required)
 
@@ -42,15 +44,15 @@ STAGE 1: Manual KB Match (class-smartreplyr-nlp.php)
     ├── Tokenize + Stem
     ├── BM25 / TF-IDF score vs all KB entries
     ├── Intent detect → boost matching entries
-    └── Score ≥ 45%?
-         ├── YES → generate_response() → verbatim KB answer + source
+    └── Score ≥ Threshold (40–55)?
+         ├── YES → generate_response() → verbatim KB answer
          └── NO ↓
 
 STAGE 1.5: Website Content Match (auto-crawled pages/posts)
     ├── Score site_content chunks using token overlap + keywords + similarity
     ├── Page-context boost: 1.5× if user is on same page
-    └── Score ≥ 45%?
-         ├── YES → generate_site_content_response() + source link
+    └── Score ≥ Threshold (40–55)?
+         ├── YES → generate_site_content_response()
          └── NO ↓
 
 STAGE 2: OpenAI Fallback (DISABLED)
@@ -80,6 +82,9 @@ Namespace: `smartreplyr/v1`
 ### General & Bot UI
 `bot_name`, `openai_api_key`, `openai_model`, `system_prompt`, `welcome_message`, `fallback_message`, `quick_prompts`, `debug_mode`, `gdpr_enabled`, `gdpr_text`
 
+### Contact Info (NEW)
+`contact_email`, `contact_phone`, `contact_whatsapp`
+
 ### Avatar & Branding
 `avatar_url`, `primary_color`, `chat_position`, `courses_list`
 
@@ -105,6 +110,9 @@ Namespace: `smartreplyr/v1`
 
 ## Changelog
 
+- **Dynamic Contact Info:** Added a new settings tab for Helpline, WhatsApp, and Email. The bot now automatically pulls this data when users ask to "contact", "apply", "call", etc.
+- **Source Mentions Removed:** Removed "Source: Knowledge Base" and source links from bot replies for a cleaner and more professional user experience.
+- **Improved NLP Accuracy:** Implemented dynamic thresholds (40/45/55) based on query length and an "Intent Mismatch Guard" (+25 to threshold) to prevent the bot from giving wrong-category answers (e.g. course description for fee query).
 - **Excel/CSV KB Import:** Added a native, dependency-free import system for .xlsx and .csv files. Supports Append/Replace modes and provides a downloadable template.
 - **Strict KB-Only Mode:** Raised thresholds (18/22 → 45%), removed score padding, and added hard filter (min 20 chars) to ensure zero hallucinations.
 - **Verbatim Responses:** Removed random greetings, CTAs, and course injections from AI replies. What you put in the KB is exactly what the user sees.
